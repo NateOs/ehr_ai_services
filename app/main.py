@@ -16,13 +16,11 @@ from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.services.llama_service import LlamaService
+from app.dependencies import set_llama_service, get_llama_service
 
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
-
-# Global variable to store LlamaService instance
-llama_service = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,9 +32,12 @@ async def lifespan(app: FastAPI):
     
     try:
         # Initialize LlamaIndex service
-        global llama_service
         llama_service = LlamaService()
         await llama_service.initialize()
+        
+        # Set the global service instance
+        set_llama_service(llama_service)
+        
         logger.info("LlamaIndex service initialized successfully")
         
         # Add any other startup tasks here
@@ -53,8 +54,9 @@ async def lifespan(app: FastAPI):
     
     try:
         # Cleanup resources
-        if llama_service:
-            await llama_service.cleanup()
+        service = get_llama_service()
+        if service:
+            await service.cleanup()
         logger.info("Application shutdown completed")
         
     except Exception as e:
@@ -133,7 +135,7 @@ async def health_check():
     """
     try:
         # Check if LlamaService is ready
-        is_llama_ready = llama_service and await llama_service.is_ready()
+        is_llama_ready = get_llama_service() and await get_llama_service().is_ready()
         
         return {
             "status": "healthy" if is_llama_ready else "degraded",
@@ -202,9 +204,10 @@ def get_llama_service() -> LlamaService:
     """
     Dependency to get the global LlamaService instance
     """
-    if not llama_service:
+    service = get_llama_service()
+    if not service:
         raise RuntimeError("LlamaService not initialized")
-    return llama_service
+    return service
 
 # Make the dependency available for import
 app.dependency_overrides = {}
