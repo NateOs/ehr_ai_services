@@ -1,32 +1,12 @@
-from app.services.llama_service import LlamaService
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.ollama import Ollama
 from app.core.config import settings
 import logging
-import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-# Global variable to store LlamaService instance
-llama_service = None
-
-def get_llama_service() -> LlamaService:
-    """
-    Dependency to get LlamaService instance
-    """
-    if llama_service is None:
-        raise RuntimeError("LlamaService not initialized")
-    return llama_service
-
-def set_llama_service(service: LlamaService):
-    """
-    Set the global LlamaService instance
-    """
-    global llama_service
-    llama_service = service
 
 async def setup_llama_index_with_ollama():
     """

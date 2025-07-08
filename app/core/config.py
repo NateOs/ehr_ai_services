@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-3.5-turbo"
     
     # Vector Store
-    VECTOR_DIMENSION: int = 1536
+    VECTOR_DIMENSION: int = 768  # Adjust based on your embedding model
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "data/uploads"
     PROCESSED_DIR: str = "data/processed"
     TEMP_DIR: str = "data/temp"
+    
+    # Ollama Configuration
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama2"  # or "mistral", "codellama", etc.
+    OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"  # or "all-minilm"
+    
+    # Document Processing
+    DOCUMENTS_PATH: str = "./documents"
     
     @property
     def database_url(self) -> str:
