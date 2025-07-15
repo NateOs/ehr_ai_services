@@ -3,6 +3,7 @@ from app.services.llama_service import LlamaService
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -59,10 +60,10 @@ async def query_documents(
             verbose=True,
             similarity_top_k=5 if request.include_sources else 3
         )
-        
+
         # Execute the query
         logger.info(f"Processing query: {request.query[:100]}...")
-        response = query_engine.query(request.query)
+        response = query_engine.query(f"{settings.AI_SYSTEM_PROMPT}\n\nUser Query: {request.query}")
         
         # Prepare source documents if requested
         sources = []

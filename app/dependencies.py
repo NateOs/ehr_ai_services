@@ -39,7 +39,8 @@ async def setup_llama_index_with_ollama():
         Settings.llm = Ollama(
             model=settings.OLLAMA_MODEL,
             base_url=settings.OLLAMA_BASE_URL,
-            request_timeout=120.0
+            request_timeout=120,
+            context_window=2048
         )
         
         Settings.embed_model = OllamaEmbedding(

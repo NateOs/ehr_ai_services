@@ -35,7 +35,7 @@ async def setup_llama_index_with_ollama():
             password=settings.POSTGRES_PASSWORD,
             port=settings.POSTGRES_PORT,
             user=settings.POSTGRES_USER,
-            table_name="document_embeddings",
+            table_name=settings.EMBEDDINGS_TABLE_NAME,
             embed_dim=settings.VECTOR_DIMENSION,
         )
         

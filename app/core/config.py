@@ -21,8 +21,13 @@ class Settings(BaseSettings):
     
     # LlamaIndex
     OPENAI_API_KEY: Optional[str] = None
+    EMBEDDINGS_TABLE_NAME: str = "embeddings"
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     LLM_MODEL: str = "gpt-3.5-turbo"
+    
+    AI_SYSTEM_PROMPT: str = """You are an AI medical expert. You will be given a question about a medical document.
+    Respond with the necessary information from the document, and if possible, provide a summary."""
+    
     
     # Vector Store
     VECTOR_DIMENSION: int = 768  # Adjust based on your embedding model
@@ -38,7 +43,7 @@ class Settings(BaseSettings):
     
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama2"  # or "mistral", "codellama", etc.
+    OLLAMA_MODEL: str = "llama3.2:1b"  # or "mistral", "codellama", etc.
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"  # or "all-minilm"
     
     # Document Processing
