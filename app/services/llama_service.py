@@ -1,11 +1,7 @@
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.vector_stores.postgres import PGVectorStore
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.llms.openai import OpenAI
-from app.core.config import settings
-from app.core.llama_setup import setup_llama_index_with_ollama, create_query_engine, load_documents_to_index
+from app.core.llama_setup import setup_llama_index_with_openai, create_query_engine, load_documents_to_index
 import logging
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -16,18 +12,18 @@ class LlamaService:
         self._initialized = False
 
     async def initialize(self):
-        """Initialize LlamaIndex with Ollama and PostgreSQL vector store"""
+        """Initialize LlamaIndex with OpenAI and PostgreSQL vector store"""
         if self._initialized:
             return
             
         try:
-            logger.info("Initializing LlamaService with Ollama...")
+            logger.info("Initializing LlamaService with OpenAI...")
             
-            # Setup LlamaIndex with Ollama
-            self._index, self._vector_store = await setup_llama_index_with_ollama()
+            # Setup LlamaIndex with OpenAI
+            self._index, self._vector_store = await setup_llama_index_with_openai()
             
             self._initialized = True
-            logger.info("LlamaService initialized successfully with Ollama")
+            logger.info("LlamaService initialized successfully with OpenAI")
             
         except Exception as e:
             logger.error(f"Failed to initialize LlamaService: {e}")
@@ -69,14 +65,13 @@ class LlamaService:
             raise RuntimeError("LlamaService not initialized")
         
         query_engine = self.create_query_engine(**engine_kwargs)
-        response = await query_engine.aquery(query_text)
+        response = query_engine.query(query_text)
         return response
 
     async def cleanup(self):
         """Cleanup resources"""
         if self._vector_store:
-            # Close any connections if needed
+            # Perform any necessary cleanup
             pass
-        
         self._initialized = False
         logger.info("LlamaService cleanup completed")

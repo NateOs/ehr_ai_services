@@ -19,18 +19,17 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_HOSTS: List[str] = ["*"]
     
-    # LlamaIndex
+    # LlamaIndex - Updated to use OpenAI
     OPENAI_API_KEY: Optional[str] = None
-    EMBEDDINGS_TABLE_NAME: str = "embeddings"
-    EMBEDDING_MODEL: str = "text-embedding-ada-002"
-    LLM_MODEL: str = "gpt-3.5-turbo"
+    EMBEDDINGS_TABLE_NAME: str = "data_embeddings"  # Make sure this matches your SQL
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    LLM_MODEL: str = "gpt-4o-mini"
     
     AI_SYSTEM_PROMPT: str = """You are an AI medical expert. You will be given a question about a medical document.
     Respond with the necessary information from the document, and if possible, provide a summary."""
     
-    
-    # Vector Store
-    VECTOR_DIMENSION: int = 768  # Adjust based on your embedding model
+    # Vector Store - Updated for OpenAI embeddings
+    VECTOR_DIMENSION: int = int(os.getenv("VECTOR_DIMENSION", "1536"))  # text-embedding-3-small dimension
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -40,11 +39,6 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "data/uploads"
     PROCESSED_DIR: str = "data/processed"
     TEMP_DIR: str = "data/temp"
-    
-    # Ollama Configuration
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3.2:1b"  # or "mistral", "codellama", etc.
-    OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"  # or "all-minilm"
     
     # Document Processing
     DOCUMENTS_PATH: str = "./documents"
