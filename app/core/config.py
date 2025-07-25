@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "ehr_ai_db"
     POSTGRES_PORT: int = 5432
-    
-    # CORS
     ALLOWED_HOSTS: List[str] = ["*"]
     
     # LlamaIndex - Updated to use OpenAI
@@ -44,7 +42,7 @@ class Settings(BaseSettings):
     DOCUMENTS_PATH: str = "./documents"
     
     @property
-    def database_url(self) -> str:
+    def DATABASE_URL(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
     class Config:
