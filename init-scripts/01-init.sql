@@ -1,3 +1,4 @@
+
 -- Create the vector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -69,37 +70,32 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX IF NOT EXISTS documents_embedding_idx ON documents 
 USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
--- Create a function to update the 'updated_at' timestamp
-CREATE OR REPLACE FUNCTION update_modified_column()
-RETURNS TRIGGER AS $
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$ language 'plpgsql';
+-- Create patient_identifiers table
+CREATE TABLE IF NOT EXISTS patient_identifiers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_code VARCHAR(255) NOT NULL UNIQUE,
+    external_id VARCHAR(255),
+    facility_id UUID REFERENCES facilities(id),
+    age_range VARCHAR(50),
+    gender VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Create triggers to automatically update 'updated_at' for all tables
-CREATE TRIGGER update_facilities_modtime
-    BEFORE UPDATE ON facilities
-    FOR EACH ROW
-    EXECUTE FUNCTION update_modified_column();
+-- Update documents table to include patient_identifier_id and new fields
+ALTER TABLE documents 
+ADD COLUMN IF NOT EXISTS patient_identifier_id UUID REFERENCES patient_identifiers(id),
+ADD COLUMN IF NOT EXISTS document_type VARCHAR(100),
+ADD COLUMN IF NOT EXISTS document_category VARCHAR(100) DEFAULT 'clinical',
+ADD COLUMN IF NOT EXISTS sensitivity_level VARCHAR(50) DEFAULT 'standard';
 
-CREATE TRIGGER update_users_modtime
-    BEFORE UPDATE ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION update_modified_column();
-
-CREATE TRIGGER update_vector_dbs_modtime
-    BEFORE UPDATE ON vector_dbs
-    FOR EACH ROW
-    EXECUTE FUNCTION update_modified_column();
-
-CREATE TRIGGER update_collections_modtime
-    BEFORE UPDATE ON collections
-    FOR EACH ROW
-    EXECUTE FUNCTION update_modified_column();
-
-CREATE TRIGGER update_documents_modtime
-    BEFORE UPDATE ON documents
-    FOR EACH ROW
-    EXECUTE FUNCTION update_modified_column();
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_patient_identifiers_patient_code ON patient_identifiers(patient_code);
+CREATE INDEX IF NOT EXISTS idx_patient_identifiers_facility_id ON patient_identifiers(facility_id);
+CREATE INDEX IF NOT EXISTS idx_documents_patient_identifier_id ON documents(patient_identifier_id);
+CREATE INDEX IF NOT EXISTS idx_documents_document_type ON documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_facilities_name ON facilities(name);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_collections_vector_db_id ON collections(vector_db_id);
+CREATE INDEX IF NOT EXISTS idx_documents_collection_id ON documents(collection_id);
