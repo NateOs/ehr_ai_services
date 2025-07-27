@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from app.api.v1.endpoints import medical_data
 from .endpoints import query
 from app.models import Facility, FacilityCreate, FacilityResponse, VectorDB, Collection
 from app.models.sql_models import Facility as SQLFacility  # Import SQLAlchemy model
@@ -10,6 +12,7 @@ from fastapi import Depends
 api_router = APIRouter()
 
 api_router.include_router(query.router, tags=["query"])
+api_router.include_router(medical_data.router, tags=["medical_data"])
 
 @api_router.get("/test")
 async def test_endpoint():
@@ -30,6 +33,10 @@ async def create_facility(facility_data: FacilityCreate, db: Session = Depends(g
     db.add(facility)
     db.commit()
     db.refresh(facility)
+    
+    # additional operations
+    # - TODO create a folder for facility in facility name, for storing uploads specific to that facility
+    
     
     return FacilityResponse(
         id=facility.id,
