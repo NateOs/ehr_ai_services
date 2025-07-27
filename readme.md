@@ -45,10 +45,3 @@ some of these are going to be background processes that will populate the db wit
 
 [] POST /training_endpoint
    - will accept files, images, text data?
-
-Multitenancy
-- separate instances in terms of vdb, training_data...
-- there should be a general table too for general medical inferences
-
-- if user has already been authenticated in ehr, how do we persist the same auth credential?
-- also what to do when the user logs out?
