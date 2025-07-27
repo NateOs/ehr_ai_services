@@ -19,7 +19,28 @@ async def create_patient_identifier(
     patient_data: PatientIdentifierCreate,
     db: Session = Depends(get_db_session)
 ):
-    """Create a minimal patient identifier"""
+    """
+    Create a minimal patient identifier
+    
+    **Age Range Format:**
+    - Use format "XX-YY" where XX is start age and YY is end age
+    - Examples: "25-30", "60-65", "0-5", "80-85"
+    - Both ages must be between 0 and 150
+    - Start age must be less than end age
+    
+    **Gender Options:**
+    - M, F, Male, Female, Other, Non-binary, Prefer not to say
+    
+    **Example Request:**
+    ```json
+    {
+        "patient_code": "PAT001",
+        "external_id": "EXT123",
+        "facility_id": "c115e85c-b368-4e29-b945-2918fa679e57",
+        "age_range": "25-30",
+        "gender": "M"
+    }
+    """
     try:
         patient_identifier = PatientIdentifier(**patient_data.dict())
         db.add(patient_identifier)
