@@ -79,3 +79,40 @@ class UserResponse(BaseModel):
     is_admin: bool
     created_at: datetime
     updated_at: datetime
+
+class PatientIdentifierCreate(BaseModel):
+    patient_code: str
+    external_id: Optional[str] = None
+    facility_id: UUID
+    age_range: Optional[str] = None
+    gender: Optional[str] = None
+
+class PatientIdentifierResponse(BaseModel):
+    id: UUID
+    patient_code: str
+    external_id: Optional[str]
+    facility_id: UUID
+    age_range: Optional[str]
+    gender: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+class MedicalDocumentCreate(BaseModel):
+    content: str
+    metadata: Dict[str, str] = {}
+    patient_identifier_id: Optional[UUID] = None
+    document_type: str
+    document_category: str = "clinical"
+    sensitivity_level: str = "standard"
+    collection_id: Optional[UUID] = None
+
+class MedicalDocumentResponse(BaseModel):
+    id: UUID
+    patient_identifier_id: Optional[UUID]
+    document_type: str
+    document_category: str
+    sensitivity_level: str
+    metadata: Dict[str, str]
+    created_at: datetime
+    updated_at: datetime
+    # Note: content and embedding are excluded from response for privacy
