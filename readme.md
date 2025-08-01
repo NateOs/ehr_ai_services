@@ -4,6 +4,17 @@ API Endpoints:
 all endpoints will require auth, not necessarily user auth, more like if the user is from tenant A, and has login token allow...
 some of these are going to be background processes that will populate the db without active user interaction.
 
+[] POST /api/v1/patient-identifiers (create patient)
+   - create anonyfied patient id that links to external system id
+   - facility must exist prior
+
+[] GET /api/v1/patient-identifiers (get Patients by facility)
+   - get all anonyfied patient id that links to external system id
+
+[] GET /api/v1/patient-identifiers/patient_code
+   - get patient identifier with patient code(this is the real anon identifier)
+
+
 //  for the professional
 [] POST /api/v1/analyze/results
    - takes in either a file and text data or just text data
