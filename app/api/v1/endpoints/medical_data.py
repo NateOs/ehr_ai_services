@@ -9,7 +9,7 @@ from app.models.models import (
     MedicalDocumentResponse
 )
 from app.services.llama_service import LlamaService
-from app.models.sql_models import PatientIdentifier, Document
+from app.models.sql_models import PatientIdentifier, Document, Collection, VectorDB, Facility
 from uuid import UUID
 
 router = APIRouter()
@@ -20,14 +20,20 @@ async def create_patient_identifier(
     db: Session = Depends(get_db_session)
 ):
     """
-    Create an anonymized patient identifier that links to external system ID.
+    Create an anonymized patient identifier with dedicated collection for their medical data.
     
     **Important:** The facility must exist prior to creating a patient identifier.
+    
+    **Auto-Collection Creation:**
+    - Automatically creates a dedicated collection for this patient's medical documents
+    - Collection name format: "Patient_{patient_code}_Collection"
+    - Ensures proper data isolation and organization per patient
     
     **Purpose:**
     - Creates anonymized patient ID (`patient_code`) for HIPAA compliance
     - Links to external system identifier (`external_id`) for integration
     - Maintains minimal demographics for filtering without exposing PII
+    - Sets up vector storage infrastructure for patient's medical documents
     
     **Age Range Format:**
     - Use format "XX-YY" where XX is start age and YY is end age
@@ -63,17 +69,54 @@ async def create_patient_identifier(
     }
     ```
     
+    **What Gets Created:**
+    1. Patient identifier record
+    2. Dedicated collection: "Patient_PAT001_HOSP_A_Collection"
+    3. Ready-to-use storage for patient's medical documents
+    
     **Use Cases:**
     - Hospital EMR system creates anonymized patient records
     - Clinic management system integrates patient data
     - Research systems need de-identified patient references
+    - AI-powered medical document analysis per patient
     """
     try:
+        # Validate that facility exists and has a VectorDB
+        facility = db.query(Facility).filter(Facility.id == patient_data.facility_id).first()
+        if not facility:
+            raise HTTPException(status_code=400, detail="Facility not found")
+        
+        # Get facility's VectorDB
+        facility_vector_db = db.query(VectorDB).filter(
+            VectorDB.facility_id == patient_data.facility_id
+        ).first()
+        if not facility_vector_db:
+            raise HTTPException(
+                status_code=400, 
+                detail="Facility's vector database not found. Please contact administrator."
+            )
+        
+        # Create patient identifier
         patient_identifier = PatientIdentifier(**patient_data.dict())
         db.add(patient_identifier)
         db.commit()
         db.refresh(patient_identifier)
+        
+        # Create dedicated collection for this patient
+        patient_collection = Collection(
+            name=f"Patient_{patient_data.patient_code}_Collection",
+            description=f"Medical documents collection for patient {patient_data.patient_code}",
+            vector_db_id=facility_vector_db.id
+        )
+        
+        db.add(patient_collection)
+        db.commit()
+        db.refresh(patient_collection)
+        
         return patient_identifier
+        
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating patient identifier: {str(e)}")
@@ -208,10 +251,100 @@ async def ingest_medical_document(
     document_data: MedicalDocumentCreate,
     db: Session = Depends(get_db_session)
 ):
-    """Ingest medical document and create vector embedding"""
+    """
+    Ingest medical document into patient's dedicated collection.
+    
+    **Auto-Collection Assignment:**
+    - Automatically uses patient's dedicated collection
+    - Collection format: "Patient_{patient_code}_Collection"
+    - Ensures proper data isolation per patient
+    - No need to specify collection_id in request
+    
+    **Document Processing:**
+    - Stores original document content
+    - Creates vector embeddings for AI querying
+    - Maintains document metadata and classification
+    - Links to patient's anonymized identifier
+    
+    **Document Types:**
+    - clinical_note, diagnosis, lab_result, prescription, discharge_summary, 
+    - radiology_report, pathology_report, consultation_note, progress_note
+    
+    **Document Categories:**
+    - clinical, administrative, billing, research, imaging
+    
+    **Sensitivity Levels:**
+    - standard, sensitive, restricted
+    
+    **Example Request:**
+    ```json
+    {
+        "content": "Patient presents with acute chest pain. Onset 2 hours ago, described as crushing, radiating to left arm. Vital signs: BP 140/90, HR 95, RR 18, O2 sat 98%. ECG shows normal sinus rhythm with no acute ST changes. Troponin I pending. Started on aspirin 325mg, nitroglycerin SL PRN. Plan: serial ECGs, troponin levels q6h, cardiology consult.",
+        "patient_identifier_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "document_type": "clinical_note",
+        "document_category": "clinical",
+        "sensitivity_level": "standard",
+        "metadata": {
+            "provider": "Dr. Sarah Johnson",
+            "department": "Emergency Department",
+            "visit_date": "2024-01-15",
+            "visit_type": "emergency",
+            "chief_complaint": "chest pain"
+        }
+    }
+    ```
+    
+    **Example Response:**
+    ```json
+    {
+        "id": "doc123e4-5678-9abc-def0-123456789abc",
+        "patient_identifier_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "document_type": "clinical_note",
+        "document_category": "clinical",
+        "sensitivity_level": "standard",
+        "metadata": {
+            "provider": "Dr. Sarah Johnson",
+            "department": "Emergency Department",
+            "visit_date": "2024-01-15",
+            "visit_type": "emergency",
+            "chief_complaint": "chest pain"
+        },
+        "created_at": "2024-01-15T14:30:00Z",
+        "updated_at": "2024-01-15T14:30:00Z"
+    }
+    ```
+    
+    **Use Cases:**
+    - EMR systems uploading patient records
+    - Clinical documentation workflows
+    - AI-powered medical analysis and insights
+    - Research data collection (anonymized)
+    - Quality improvement initiatives
+    """
     try:
-        # For now, we'll create the document without embedding
-        # You can add the LlamaService integration later
+        # Validate that patient identifier exists
+        patient_identifier = db.query(PatientIdentifier).filter(
+            PatientIdentifier.id == document_data.patient_identifier_id
+        ).first()
+        if not patient_identifier:
+            raise HTTPException(
+                status_code=400, 
+                detail="Patient identifier not found"
+            )
+        
+        # Find patient's dedicated collection
+        patient_collection = db.query(Collection).join(VectorDB).filter(
+            VectorDB.facility_id == patient_identifier.facility_id,
+            Collection.name == f"Patient_{patient_identifier.patient_code}_Collection"
+        ).first()
+        
+        if not patient_collection:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Patient collection not found for {patient_identifier.patient_code}. Please contact administrator."
+            )
+        
+        # Create document in patient's collection
         document = Document(
             content=document_data.content,
             metadata_json=document_data.metadata,
@@ -219,14 +352,13 @@ async def ingest_medical_document(
             document_type=document_data.document_type,
             document_category=document_data.document_category,
             sensitivity_level=document_data.sensitivity_level,
-            collection_id=document_data.collection_id if hasattr(document_data, 'collection_id') else None
+            collection_id=patient_collection.id
         )
         
         db.add(document)
         db.commit()
         db.refresh(document)
         
-        # Return response without sensitive content
         return MedicalDocumentResponse(
             id=document.id,
             patient_identifier_id=document.patient_identifier_id,
@@ -237,6 +369,9 @@ async def ingest_medical_document(
             created_at=document.created_at,
             updated_at=document.updated_at
         )
+        
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating medical document: {str(e)}")
