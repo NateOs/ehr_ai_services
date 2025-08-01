@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EHR AI Services - Database Schema Map</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 40px;
+            font-size: 1.2em;
+        }
+        
+        .schema-map {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .model-card {
+            border: 2px solid #3498db;
+            border-radius: 12px;
+            padding: 20px;
+            background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+        
+        .model-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+        }
+        
+        .model-card.primary {
+            border-color: #e74c3c;
+            background: linear-gradient(145deg, #fff5f5, #ffe6e6);
+        }
+        
+        .model-card.secondary {
+            border-color: #f39c12;
+            background: linear-gradient(145deg, #fffbf0, #fff3cd);
+        }
+        
+        .model-card.tertiary {
+            border-color: #27ae60;
+            background: linear-gradient(145deg, #f0fff4, #d4edda);
+        }
+        
+        .model-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        
+        .model-description {
+            color: #7f8c8d;
+            font-style: italic;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        
+        .fields-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .field-item {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.7);
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        
+        .field-item.primary-key {
+            border-left-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        
+        .field-item.foreign-key {
+            border-left-color: #f39c12;
+            background: rgba(243, 156, 18, 0.1);
+        }
+        
+        .field-item.relationship {
+            border-left-color: #27ae60;
+            background: rgba(39, 174, 96, 0.1);
+        }
+        
+        .relationships-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(145deg, #f1f3f4, #e8eaed);
+            border-radius: 12px;
+            border: 2px solid #9b59b6;
+        }
+        
+        .relationships-title {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .relationship-flow {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .flow-item {
+            padding: 12px 20px;
+            background: #3498db;
+            color: white;
+            border-radius: 25px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .flow-arrow {
+            font-size: 1.5em;
+            color: #7f8c8d;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .data-flow-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(145deg, #fff9e6, #fff3cd);
+            border-radius: 12px;
+            border: 2px solid #f39c12;
+        }
+        
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .workflow-step {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #f39c12;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .step-number {
+            background: #f39c12;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 EHR AI Services</h1>
+        <p class="subtitle">Database Schema & Model Relationships</p>
+        
+        <div class="schema-map">
+            <!-- Facility Model -->
+            <div class="model-card primary">
+                <div class="model-title">🏢 Facility</div>
+                <div class="model-description">Healthcare facilities (hospitals, clinics)</div>
+                <ul class="fields-list">
+                    <li class="field-item primary-key">🔑 id: UUID (Primary Key)</li>
+                    <li class="field-item">📝 name: String (Required)</li>
+                    <li class="field-item">📍 address: String</li>
+                    <li class="field-item">📅 created_at: DateTime</li>
+                    <li class="field-item">📅 updated_at: DateTime</li>
+                    <li class="field-item relationship">🔗 vector_db: One VectorDB</li>
+                    <li class="field-item relationship">🔗 users: Many Users</li>
+                    <li class="field-item relationship">🔗 patient_identifiers: Many PatientIdentifiers</li>
+                </ul>
+            </div>
+
+            <!-- VectorDB Model -->
+            <div class="model-card secondary">
+                <div class="model-title">🗄️ VectorDB</div>
+                <div class="model-description">Vector database for AI embeddings per facility</div>
+                <ul class="fields-list">
+                    <li class="field-item primary-key">🔑 id: UUID (Primary Key)</li>
+                    <li class="field-item">📝 name: String (Required)</li>
+                    <li class="field-item foreign-key">🔗 facility_id: UUID → Facility</li>
+                    <li class="field-item">📅 created_at: DateTime</li>
+                    <li class="field-item">📅 updated_at: DateTime</li>
+                    <li class="field-item relationship">🔗 facility: One Facility</li>
+                    <li class="field-item relationship">🔗 collections: Many Collections</li>
+                </ul>
+            </div>
+
+            <!-- Collection Model -->
+            <div class="model-card tertiary">
+                <div class="model-title">📁 Collection</div>
+                <div class="model-description">Document collections (patient-specific or shared)</div>
+                <ul class="fields-list">
+                    <li class="field-item primary-key">🔑 id: UUID (Primary Key)</li>
+                    <li class="field-item">📝 name: String (Required)</li>
+                    <li class="field-item">📄 description: String</li>
+                    <li class="field-item foreign-key">🔗 vector_db_id: UUID → VectorDB</li>
+                    <li class="field-item">📅 created_at: DateTime</li>
+                    <li class="field-item">📅 updated_at: DateTime</li>
+                    <li class="field-item relationship">🔗 vector_db: One VectorDB</li>
+                    <li class="field-item relationship">🔗 documents: Many Documents</li>
+                </ul>
+            </div>
+
+            <!-- PatientIdentifier Model -->
+            <div class="model-card primary">
+                <div class="model-title">👤 PatientIdentifier</div>
+                <div class="model-description">Anonymized patient identifiers (HIPAA compliant)</div>
+                <ul class="fields-list">
+                    <li class="field-item primary-key">🔑 id: UUID (Primary Key)</li>
+                    <li class="field-item">🏷️ patient_code: String (Unique, Required)</li>
+                    <li class="field-item">🆔 external_id: String (Optional)</li>
+                    <li class="field-item foreign-key">🔗 facility_id: UUID → Facility</li>
+                    <li class="field-item">📊 age_range: String (e.g., "25-30")</li>
+                    <li class="field-item">⚧️ gender: String (Optional)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
