@@ -11,6 +11,15 @@ class GenderEnum(str, Enum):
     NON_BINARY = "Non-binary"
     PREFER_NOT_TO_SAY = "Prefer not to say"
 
+class DocumentTypeEnum(str, Enum):
+    MEDICAL_RECORD = "medical_record"
+    LAB_RESULT = "lab_result"
+    IMAGING_REPORT = "imaging_report"
+    DISCHARGE_SUMMARY = "discharge_summary"
+    CLINICAL_NOTE = "clinical_note"
+    PRESCRIPTION = "prescription"
+    OTHER = "other"
+
 class Document(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     content: str
@@ -66,8 +75,12 @@ class UserCreate(BaseModel):
     is_admin: bool = False
 
 class DocumentCreate(BaseModel):
-    content: str
-    metadata: Dict[str, str] = {}
+    filename: str = Field(..., description="Original filename of the document")
+    content_type: str = Field(..., description="MIME type of the document")
+    document_type: DocumentTypeEnum = Field(..., description="Type of medical document")
+    patient_code: Optional[str] = Field(None, description="Patient identifier code")
+    facility_id: UUID = Field(..., description="Facility this document belongs to")
+    metadata: Optional[Dict] = Field(default_factory=dict, description="Additional document metadata")
 
 class CollectionCreate(BaseModel):
     name: str
@@ -137,3 +150,25 @@ class MedicalDocumentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     # Note: content and embedding are excluded from response for privacy
+
+class DocumentResponse(BaseModel):
+    id: UUID
+    filename: str
+    content_type: str
+    document_type: DocumentTypeEnum
+    patient_code: Optional[str]
+    facility_id: UUID
+    file_path: str
+    file_size: int
+    processed: bool = False
+    metadata: Optional[Dict] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class DocumentUploadResponse(BaseModel):
+    document: DocumentResponse
+    message: str
+    processing_status: str = "queued"
