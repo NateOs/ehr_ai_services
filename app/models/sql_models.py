@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, JSON, Text
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 from app.db import Base
@@ -18,6 +18,7 @@ class Facility(Base):
     users = relationship("User", back_populates="facility")
     patient_identifiers = relationship("PatientIdentifier", back_populates="facility")
     vector_db = relationship("VectorDB", back_populates="facility", uselist=False)
+    documents = relationship("Document", back_populates="facility")
 
 class User(Base):
     __tablename__ = 'users'
@@ -61,24 +62,19 @@ class Document(Base):
     __tablename__ = 'documents'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    content = Column(String, nullable=False)  # Original text for reference
-    metadata_json = Column(JSON)  # Store document metadata
-    embedding = Column(ARRAY(Float))  # Vector representation
-    
-    # Relationships
-    collection_id = Column(UUID(as_uuid=True), ForeignKey('collections.id'))
-    patient_identifier_id = Column(UUID(as_uuid=True), ForeignKey('patient_identifiers.id'), nullable=True)
-    
-    # Document classification
-    document_type = Column(String)  # diagnosis, lab_result, prescription, note, etc.
-    document_category = Column(String)  # clinical, administrative, etc.
-    
-    # Privacy and access control
-    sensitivity_level = Column(String, default='standard')  # standard, sensitive, restricted
-    
+    filename = Column(String, nullable=False)
+    content_type = Column(String, nullable=False)
+    document_type = Column(String, nullable=False)
+    patient_code = Column(String, nullable=True)
+    facility_id = Column(UUID(as_uuid=True), ForeignKey('facilities.id'), nullable=False)
+    file_path = Column(String, nullable=False)
+    file_size = Column(Integer, nullable=False)
+    processed = Column(Boolean, default=False)
+    metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
+    facility = relationship("Facility", back_populates="documents")
     collection = relationship("Collection", back_populates="documents")
     patient_identifier = relationship("PatientIdentifier", back_populates="medical_documents")
 
