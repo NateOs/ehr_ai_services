@@ -8,7 +8,7 @@ from app.db import get_db_session
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
 
-api_router = APIRouter()
+router = APIRouter()
 
 
 async def get_facility_by_external_id(
@@ -40,7 +40,7 @@ async def get_facility_by_external_id(
     
     return facility
 
-@api_router.post("/facilities", response_model=FacilityResponse)
+@router.post("/facilities", response_model=FacilityResponse)
 async def create_facility(facility_data: FacilityCreate, db: Session = Depends(get_db_session)):
     """
     Create a new facility with its associated VectorDB and shared collection.
@@ -140,7 +140,7 @@ async def create_facility(facility_data: FacilityCreate, db: Session = Depends(g
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating facility: {str(e)}")
 
-@api_router.get("/facilities", response_model=list[FacilityResponse])
+@router.get("/facilities", response_model=list[FacilityResponse])
 async def list_facilities(db: Session = Depends(get_db_session)):
     """
     List all facilities.
@@ -177,7 +177,7 @@ async def list_facilities(db: Session = Depends(get_db_session)):
         for facility in facilities
     ]
 
-@api_router.get("/facilities/{facility_id}", response_model=FacilityResponse)
+@router.get("/facilities/{facility_id}", response_model=FacilityResponse)
 async def get_facility(facility_id: str, db: Session = Depends(get_db_session)):
     """
     Get facility by ID.
