@@ -111,7 +111,7 @@ class PatientIdentifierCreate(BaseModel):
     age_range: Optional[str] = Field(
         None, 
         description="Age range in format 'XX-YY' (e.g., '25-30')",
-        regex=r"^\d{1,3}-\d{1,3}$"
+        pattern=r"^\d{1,3}-\d{1,3}$"
     )
     gender: Optional[GenderEnum] = Field(
         None, 

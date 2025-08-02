@@ -1,13 +1,6 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter
 
-from app.api.v1.endpoints import documents, facilities, medical_data
-from .endpoints import query
-from app.models import Facility, FacilityCreate, FacilityResponse, VectorDB, Collection
-from app.models.sql_models import Facility as SQLFacility  # Import SQLAlchemy model
-from app.db import get_db_session
-from sqlalchemy.orm import Session
-from fastapi import Depends
+from app.api.v1.endpoints import documents, facilities, medical_data, query
 
 api_router = APIRouter()
 

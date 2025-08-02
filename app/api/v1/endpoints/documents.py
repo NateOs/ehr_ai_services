@@ -26,15 +26,12 @@ ALLOWED_MIME_TYPES = {
     'text/plain',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/msword',
-    'text/markdown'
+    'text/markdown',
+    'text/x-markdown'
 }
 
 def validate_file(file: UploadFile) -> bool:
     """Validate uploaded file type and size"""
-    # Check file size
-    if file.size and file.size > settings.MAX_FILE_SIZE:
-        return False
-    
     # Check file extension
     file_ext = Path(file.filename).suffix.lower()
     if file_ext not in ALLOWED_EXTENSIONS:
@@ -48,7 +45,8 @@ def validate_file(file: UploadFile) -> bool:
 
 def ensure_upload_directories():
     """Ensure upload directories exist"""
-    for directory in [settings.UPLOAD_DIR, settings.PROCESSED_DIR, settings.TEMP_DIR]:
+    directories = ['uploads', 'uploads/documents', 'uploads/processed']
+    for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
 
 @router.post("/upload", response_model=DocumentUploadResponse)
