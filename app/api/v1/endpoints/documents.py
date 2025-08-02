@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -109,7 +110,7 @@ async def upload_document(
             facility_id=facility_id,
             file_path=str(file_path),
             file_size=file_size,
-            metadata=parsed_metadata
+            document_metadata=parsed_metadata  # Changed from 'metadata' to 'document_metadata'
         )
         
         db.add(document_data)
@@ -127,7 +128,7 @@ async def upload_document(
             file_path=document_data.file_path,
             file_size=document_data.file_size,
             processed=document_data.processed,
-            metadata=document_data.metadata,
+            metadata=document_data.document_metadata,  # Map back to 'metadata' for API response
             created_at=document_data.created_at,
             updated_at=document_data.updated_at
         )
@@ -187,7 +188,7 @@ async def get_documents(
             file_path=doc.file_path,
             file_size=doc.file_size,
             processed=doc.processed,
-            metadata=doc.metadata,
+            metadata=doc.document_metadata,  # Map back to 'metadata' for API response
             created_at=doc.created_at,
             updated_at=doc.updated_at
         )
@@ -216,7 +217,7 @@ async def get_document(
         file_path=document.file_path,
         file_size=document.file_size,
         processed=document.processed,
-        metadata=document.metadata,
+        metadata=document.document_metadata,  # Map back to 'metadata' for API response
         created_at=document.created_at,
         updated_at=document.updated_at
     )
@@ -240,7 +241,7 @@ async def process_document(
         
         # Update document processed status
         document.processed = True
-        document.metadata.update(processing_result)
+        document.document_metadata.update(processing_result)  # Updated to use 'document_metadata'
         db.commit()
         db.refresh(document)
         
@@ -256,7 +257,7 @@ async def process_document(
             file_path=document.file_path,
             file_size=document.file_size,
             processed=document.processed,
-            metadata=document.metadata,
+            metadata=document.document_metadata,  # Map back to 'metadata' for API response
             created_at=document.created_at,
             updated_at=document.updated_at
         )

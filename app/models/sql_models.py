@@ -18,7 +18,7 @@ class Facility(Base):
     users = relationship("User", back_populates="facility")
     patient_identifiers = relationship("PatientIdentifier", back_populates="facility")
     vector_db = relationship("VectorDB", back_populates="facility", uselist=False)
-    documents = relationship("Document", back_populates="facility")
+    documents = relationship("Document", back_populates="facility")  # Add this line
 
 class User(Base):
     __tablename__ = 'users'
@@ -70,7 +70,7 @@ class Document(Base):
     file_path = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)
     processed = Column(Boolean, default=False)
-    metadata = Column(JSON, nullable=True)
+    document_metadata = Column(JSON, nullable=True)  # Changed from 'metadata' to 'document_metadata'
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
