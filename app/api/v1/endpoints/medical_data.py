@@ -41,8 +41,10 @@ async def create_patient_identifier(
     - Both ages must be between 0 and 150
     - Start age must be less than end age
     
-    **Gender Options:**
-    - M, F, Male, Female, Other, Non-binary, Prefer not to say
+    **Gender Options (Medical/Biological):**
+    - M: Male
+    - F: Female  
+    - Unknown: For cases where biological gender is not determined or recorded
     
     **Example Request:**
     ```json

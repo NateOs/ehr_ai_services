@@ -7,9 +7,7 @@ from enum import Enum
 class GenderEnum(str, Enum):
     MALE = "M"
     FEMALE = "F"
-    OTHER = "Other"
-    NON_BINARY = "Non-binary"
-    PREFER_NOT_TO_SAY = "Prefer not to say"
+    UNKNOWN = "Unknown"  # For cases where gender is not determined/recorded
 
 class DocumentTypeEnum(str, Enum):
     MEDICAL_RECORD = "medical_record"
@@ -112,13 +110,12 @@ class PatientIdentifierCreate(BaseModel):
     facility_id: UUID = Field(..., description="UUID of the facility this patient belongs to")
     age_range: Optional[str] = Field(
         None, 
-        description="Age range in format 'XX-YY' where XX and YY are ages (e.g., '25-30', '60-65')",
-        example="25-30",
-        pattern=r'^\d{1,3}-\d{1,3}'
+        description="Age range in format 'XX-YY' (e.g., '25-30')",
+        regex=r"^\d{1,3}-\d{1,3}$"
     )
     gender: Optional[GenderEnum] = Field(
         None, 
-        description="Patient gender"
+        description="Biological gender: M (Male), F (Female), or Unknown"
     )
 
 class PatientIdentifierResponse(BaseModel):
@@ -127,9 +124,12 @@ class PatientIdentifierResponse(BaseModel):
     external_id: Optional[str]
     facility_id: UUID
     age_range: Optional[str]
-    gender: Optional[str]
+    gender: Optional[GenderEnum]
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 class MedicalDocumentCreate(BaseModel):
     content: str
