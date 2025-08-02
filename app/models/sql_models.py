@@ -10,7 +10,8 @@ class Facility(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
-    address = Column(String)
+    external_id = Column(String, nullable=True, unique=True)  # Add this field
+    address = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 

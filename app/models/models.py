@@ -55,8 +55,9 @@ class Facility(BaseModel):
 # Additional models for API requests and responses
 
 class FacilityCreate(BaseModel):
-    name: str
-    address: str
+    name: str = Field(..., description="Name of the facility")
+    address: Optional[str] = Field(None, description="Address of the facility")
+    external_id: Optional[str] = Field(None, description="External system identifier for this facility")
 
 class UserCreate(BaseModel):
     username: str
@@ -75,9 +76,13 @@ class CollectionCreate(BaseModel):
 class FacilityResponse(BaseModel):
     id: UUID
     name: str
-    address: str
+    address: Optional[str] = None
+    external_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 class UserResponse(BaseModel):
     id: UUID

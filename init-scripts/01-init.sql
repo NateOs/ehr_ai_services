@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS facilities (
     name VARCHAR(255) NOT NULL,
     address TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    external_id VARCHAR(255) UNIQUE
 );
 
 -- Create users table
