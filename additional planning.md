@@ -48,3 +48,5 @@ Use efficient indexing strategies to maintain performance as the data grows.
 Implement a background process to periodically update the general medical knowledge database.
 5.
 Consider a caching layer for frequently accessed data to improve performance.
+
+the facility should also be identifiable by its external id
