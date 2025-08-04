@@ -19,6 +19,7 @@ class Facility(Base):
     patient_identifiers = relationship("PatientIdentifier", back_populates="facility")
     vector_db = relationship("VectorDB", back_populates="facility", uselist=False)
     documents = relationship("Document", back_populates="facility")  # Add this line
+    medical_documents = relationship("MedicalDocument", back_populates="facility")  # Add this line
 
 class User(Base):
     __tablename__ = 'users'
@@ -57,6 +58,7 @@ class Collection(Base):
 
     vector_db = relationship("VectorDB", back_populates="collections")
     documents = relationship("Document", back_populates="collection")
+    medical_documents = relationship("MedicalDocument", back_populates="collection")  # Add this line
 
 class Document(Base):
     __tablename__ = 'documents'
@@ -97,4 +99,26 @@ class PatientIdentifier(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     facility = relationship("Facility", back_populates="patient_identifiers")
-    medical_documents = relationship("Document", back_populates="patient_identifier")
+    medical_documents = relationship("MedicalDocument", back_populates="patient_identifier")  # Update this line
+
+class MedicalDocument(Base):
+    __tablename__ = 'medical_documents'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content = Column(Text, nullable=False)  # Medical document content
+    document_type = Column(String, nullable=False)
+    document_category = Column(String, nullable=False, default="clinical")
+    sensitivity_level = Column(String, nullable=False, default="standard")
+    patient_identifier_id = Column(UUID(as_uuid=True), ForeignKey('patient_identifiers.id'), nullable=True)
+    collection_id = Column(UUID(as_uuid=True), ForeignKey('collections.id'), nullable=True)
+    facility_id = Column(UUID(as_uuid=True), ForeignKey('facilities.id'), nullable=False)
+    metadata_json = Column(JSON, nullable=True)
+    embedding = Column(Text, nullable=True)  # Will store vector as text for now, can be upgraded to pgvector later
+    processed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Relationships
+    patient_identifier = relationship("PatientIdentifier", back_populates="medical_documents")
+    collection = relationship("Collection", back_populates="medical_documents")
+    facility = relationship("Facility", back_populates="medical_documents")

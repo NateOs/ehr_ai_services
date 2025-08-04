@@ -9,7 +9,14 @@ from app.models.models import (
     MedicalDocumentResponse
 )
 from app.services.llama_service import LlamaService
-from app.models.sql_models import PatientIdentifier, Document, Collection, VectorDB, Facility
+from app.models.sql_models import (
+    PatientIdentifier, 
+    Document, 
+    MedicalDocument,  # Add this import
+    Collection, 
+    VectorDB, 
+    Facility
+)
 from uuid import UUID
 
 router = APIRouter()
@@ -346,30 +353,31 @@ async def ingest_medical_document(
                 detail=f"Patient collection not found for {patient_identifier.patient_code}. Please contact administrator."
             )
         
-        # Create document in patient's collection
-        document = Document(
+        # Create medical document in patient's collection
+        medical_document = MedicalDocument(
             content=document_data.content,
             metadata_json=document_data.metadata,
             patient_identifier_id=document_data.patient_identifier_id,
             document_type=document_data.document_type,
             document_category=document_data.document_category,
             sensitivity_level=document_data.sensitivity_level,
-            collection_id=patient_collection.id
+            collection_id=patient_collection.id,
+            facility_id=patient_identifier.facility_id
         )
         
-        db.add(document)
+        db.add(medical_document)
         db.commit()
-        db.refresh(document)
+        db.refresh(medical_document)
         
         return MedicalDocumentResponse(
-            id=document.id,
-            patient_identifier_id=document.patient_identifier_id,
-            document_type=document.document_type,
-            document_category=document.document_category,
-            sensitivity_level=document.sensitivity_level,
-            metadata=document.metadata_json or {},
-            created_at=document.created_at,
-            updated_at=document.updated_at
+            id=medical_document.id,
+            patient_identifier_id=medical_document.patient_identifier_id,
+            document_type=medical_document.document_type,
+            document_category=medical_document.document_category,
+            sensitivity_level=medical_document.sensitivity_level,
+            metadata=medical_document.metadata_json or {},
+            created_at=medical_document.created_at,
+            updated_at=medical_document.updated_at
         )
         
     except HTTPException:
@@ -377,6 +385,85 @@ async def ingest_medical_document(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error creating medical document: {str(e)}")
+
+@router.get("/medical-documents", response_model=List[MedicalDocumentResponse])
+async def get_medical_documents(
+    patient_identifier_id: UUID = None,
+    facility_id: UUID = None,
+    document_type: str = None,
+    document_category: str = None,
+    sensitivity_level: str = None,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Get medical documents with optional filtering.
+    
+    **Query Parameters:**
+    - `patient_identifier_id`: Filter by specific patient
+    - `facility_id`: Filter by facility
+    - `document_type`: Filter by document type
+    - `document_category`: Filter by category
+    - `sensitivity_level`: Filter by sensitivity level
+    
+    **Example Request:**
+    ```
+    GET /api/v1/medical-documents?patient_identifier_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890&document_type=clinical_note
+    ```
+    """
+    query = db.query(MedicalDocument)
+    
+    if patient_identifier_id:
+        query = query.filter(MedicalDocument.patient_identifier_id == patient_identifier_id)
+    if facility_id:
+        query = query.filter(MedicalDocument.facility_id == facility_id)
+    if document_type:
+        query = query.filter(MedicalDocument.document_type == document_type)
+    if document_category:
+        query = query.filter(MedicalDocument.document_category == document_category)
+    if sensitivity_level:
+        query = query.filter(MedicalDocument.sensitivity_level == sensitivity_level)
+    
+    medical_documents = query.all()
+    
+    return [
+        MedicalDocumentResponse(
+            id=doc.id,
+            patient_identifier_id=doc.patient_identifier_id,
+            document_type=doc.document_type,
+            document_category=doc.document_category,
+            sensitivity_level=doc.sensitivity_level,
+            metadata=doc.metadata_json or {},
+            created_at=doc.created_at,
+            updated_at=doc.updated_at
+        )
+        for doc in medical_documents
+    ]
+
+@router.get("/medical-documents/{document_id}", response_model=MedicalDocumentResponse)
+async def get_medical_document(
+    document_id: UUID,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Get a specific medical document by ID.
+    """
+    medical_document = db.query(MedicalDocument).filter(
+        MedicalDocument.id == document_id
+    ).first()
+    
+    if not medical_document:
+        raise HTTPException(status_code=404, detail="Medical document not found")
+    
+    return MedicalDocumentResponse(
+        id=medical_document.id,
+        patient_identifier_id=medical_document.patient_identifier_id,
+        document_type=medical_document.document_type,
+        document_category=medical_document.document_category,
+        sensitivity_level=medical_document.sensitivity_level,
+        metadata=medical_document.metadata_json or {},
+        created_at=medical_document.created_at,
+        updated_at=medical_document.updated_at
+    )
 
 @router.post("/query-patient-data")
 async def query_patient_medical_data(
