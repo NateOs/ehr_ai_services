@@ -67,10 +67,12 @@ class Document(Base):
     document_type = Column(String, nullable=False)
     patient_code = Column(String, nullable=True)
     facility_id = Column(UUID(as_uuid=True), ForeignKey('facilities.id'), nullable=False)
+    collection_id = Column(UUID(as_uuid=True), ForeignKey('collections.id'), nullable=True)
+    patient_identifier_id = Column(UUID(as_uuid=True), ForeignKey('patient_identifiers.id'), nullable=True)
     file_path = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)
     processed = Column(Boolean, default=False)
-    document_metadata = Column(JSON, nullable=True)  # Changed from 'metadata' to 'document_metadata'
+    document_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
