@@ -125,3 +125,37 @@ These case stories should guide the functional validation of AI modules in the E
 - Education and communication support for patients
 - Compliance with HIPAA and ethical AI principles
 
+
+## Enhanced Initial Testing Sequence:
+
+### 1. Facility Foundation
+- [] Create facility (must exist first)
+- [] Auto-create facility's VectorDB
+- [] Auto-create facility's shared collection
+- 🆕 **Validate facility isolation** (queries don't cross facilities)
+
+### 2. Patient Creation & Setup
+- [] Create patient (linked to facility)
+- [] Auto-create patient's dedicated collection
+- 🆕 **Validate patient-facility relationship constraints**
+- 🆕 **Test patient anonymization** (patient_code generation)
+
+### 3. Document Upload & Vectorization
+- [] Upload facility-level documents → facility vectorization
+- [] Upload patient-specific documents → patient vectorization
+- 🆕 **Test document type classification** (clinical vs administrative)
+- 🆕 **Validate metadata preservation** during vectorization
+- 🆕 **Test batch upload scenarios**
+
+### 4. Query Scoping & Intelligence
+- [] Facility queries → facility-scoped results + GPT fallback
+- [] Patient queries → patient-scoped results only
+- 🆕 **Test query escalation** (patient → facility → GPT)
+- 🆕 **Validate cross-patient data isolation**
+- 🆕 **Test query context preservation** across sessions
+
+### 5. Learning & Optimization
+- [] Vectorize query responses for future use
+- 🆕 **Test query result caching**
+- 🆕 **Validate response quality improvement over time**
+- 🆕 **Test vector space optimization**

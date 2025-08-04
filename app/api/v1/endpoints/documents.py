@@ -45,7 +45,12 @@ def validate_file(file: UploadFile) -> bool:
 
 def ensure_upload_directories():
     """Ensure upload directories exist"""
-    directories = ['uploads', 'uploads/documents', 'uploads/processed']
+    directories = [
+        settings.UPLOAD_DIR,           # data/uploads
+        settings.PROCESSED_DIR,        # data/processed  
+        settings.TEMP_DIR,             # data/temp
+        'uploads/documents'            # For organized storage
+    ]
     for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
 

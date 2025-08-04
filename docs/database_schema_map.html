@@ -73,6 +73,11 @@
             background: linear-gradient(145deg, #f0fff4, #d4edda);
         }
         
+        .model-card.quaternary {
+            border-color: #9b59b6;
+            background: linear-gradient(145deg, #f8f5ff, #e8d5ff);
+        }
+        
         .model-title {
             font-size: 1.4em;
             font-weight: bold;
@@ -232,12 +237,14 @@
                 <ul class="fields-list">
                     <li class="field-item primary-key">🔑 id: UUID (Primary Key)</li>
                     <li class="field-item">📝 name: String (Required)</li>
-                    <li class="field-item">📍 address: String</li>
+                    <li class="field-item">🆔 external_id: String (Unique)</li>
+                    <li class="field-item">📍 address: Text</li>
                     <li class="field-item">📅 created_at: DateTime</li>
                     <li class="field-item">📅 updated_at: DateTime</li>
                     <li class="field-item relationship">🔗 vector_db: One VectorDB</li>
                     <li class="field-item relationship">🔗 users: Many Users</li>
                     <li class="field-item relationship">🔗 patient_identifiers: Many PatientIdentifiers</li>
+                    <li class="field-item relationship">🔗 documents: Many Documents</li>
                 </ul>
             </div>
 
@@ -263,7 +270,7 @@
                 <ul class="fields-list">
                     <li class="field-item primary-key">🔑 id: UUID (Primary Key)</li>
                     <li class="field-item">📝 name: String (Required)</li>
-                    <li class="field-item">📄 description: String</li>
+                    <li class="field-item">📄 description: Text</li>
                     <li class="field-item foreign-key">🔗 vector_db_id: UUID → VectorDB</li>
                     <li class="field-item">📅 created_at: DateTime</li>
                     <li class="field-item">📅 updated_at: DateTime</li>
@@ -278,11 +285,12 @@
                 <div class="model-description">Anonymized patient identifiers (HIPAA compliant)</div>
                 <ul class="fields-list">
                     <li class="field-item primary-key">🔑 id: UUID (Primary Key)</li>
-                    <li class="field-item">🏷️ patient_code: String (Unique, Required)</li>
-                    <li class="field-item">🆔 external_id: String (Optional)</li>
+                    <li class="field-item">🏷️ identifier: String (Required)</li>
                     <li class="field-item foreign-key">🔗 facility_id: UUID → Facility</li>
-                    <li class="field-item">📊 age_range: String (e.g., "25-30")</li>
-                    <li class="field-item">⚧️ gender: String (Optional)</li>
+                    <li class="field-item">📅 created_at: DateTime</li>
+                    <li class="field-item">📅 updated_at: DateTime</li>
+                    <li class="field-item relationship">🔗 facility: One Facility</li>
+                    <li class="field-item relationship">🔗 patients: Many Patients</li>
                 </ul>
             </div>
         </div>

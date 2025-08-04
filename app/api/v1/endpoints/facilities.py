@@ -2,67 +2,37 @@ from pydantic import BaseModel
 
 from app.api.v1.endpoints import medical_data
 from ..endpoints import query
-from app.models import Facility, FacilityCreate, FacilityResponse, VectorDB, Collection
-from app.models.sql_models import Facility as SQLFacility  # Import SQLAlchemy model
+from app.models.models import FacilityCreate, FacilityResponse
+from app.models.sql_models import Facility as SQLFacility, VectorDB as SQLVectorDB, Collection as SQLCollection
 from app.db import get_db_session
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
+from typing import List
+from uuid import UUID
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
+@router.get("/facilities/external/{external_id}", response_model=FacilityResponse)
 async def get_facility_by_external_id(
     external_id: str,
     db: Session = Depends(get_db_session)
-):	
+):
     """
     Get facility by external ID for integration with external systems.
     
     **Purpose:**
-    - Allow external systems to lookup facilities using their own identifiers
-    - Support integration with EMRs, billing systems, etc.
-    - Maintain referential integrity across multiple systems
+    - Allows external systems to lookup facilities using their own identifiers
+    - Useful for EMR integrations and third-party system connections
     
-    **Path Parameters:**
-    - `external_id`: The external system's identifier for this facility
+    **Parameters:**
+    - `external_id`: The external system's identifier for the facility
     
     **Example Request:**
     ```
-    GET /api/v1/facilities/external/HOSP_SYS_12345
-    ```
-    """
-    facility = db.query(Facility).filter(
-        Facility.external_id == external_id
-    ).first()
-    
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    
-    return facility
-
-@router.post("/facilities", response_model=FacilityResponse)
-async def create_facility(facility_data: FacilityCreate, db: Session = Depends(get_db_session)):
-    """
-    Create a new facility with its associated VectorDB and shared collection.
-    
-    **Purpose:**
-    - Creates a facility for organizing patients and medical data
-    - Automatically sets up vector database infrastructure
-    - Creates a shared collection for all facility documents
-    - Supports external system integration via external_id
-    
-    **What gets created:**
-    1. Facility record (with optional external_id)
-    2. VectorDB for the facility
-    3. Shared collection for all patient documents
-    
-    **Example Request:**
-    ```json
-    {
-        "name": "General Hospital",
-        "address": "123 Medical Center Dr, City, State 12345",
-        "external_id": "HOSP_SYS_12345"
-    }
+    GET /api/v1/facilities/external/HOSP_001
     ```
     
     **Example Response:**
@@ -71,11 +41,71 @@ async def create_facility(facility_data: FacilityCreate, db: Session = Depends(g
         "id": "c115e85c-b368-4e29-b945-2918fa679e57",
         "name": "General Hospital",
         "address": "123 Medical Center Dr, City, State 12345",
-        "external_id": "HOSP_SYS_12345",
-        "created_at": "2024-01-15T10:00:00Z",
-        "updated_at": "2024-01-15T10:00:00Z"
+        "external_id": "HOSP_001",
+        "created_at": "2024-01-15T10:30:00Z",
+        "updated_at": "2024-01-15T10:30:00Z"
+    }
+    """
+    facility = db.query(SQLFacility).filter(
+        SQLFacility.external_id == external_id
+    ).first()
+    
+    if not facility:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    
+    return FacilityResponse(
+        id=facility.id,
+        name=facility.name,
+        address=facility.address,
+        external_id=facility.external_id,
+        created_at=facility.created_at,
+        updated_at=facility.updated_at
+    )
+
+@router.post("/facilities", response_model=FacilityResponse)
+async def create_facility(
+    facility_data: FacilityCreate, 
+    db: Session = Depends(get_db_session)
+):
+    """
+    Create a new healthcare facility with its associated infrastructure.
+    
+    **Auto-Infrastructure Setup:**
+    - Creates a dedicated VectorDB for the facility
+    - Sets up a shared collection for facility-wide documents
+    - Establishes the foundation for patient-specific collections
+    
+    **Request Body:**
+    ```json
+    {
+        "name": "General Hospital",
+        "address": "123 Medical Center Dr, City, State 12345",
+        "external_id": "HOSP_001"
     }
     ```
+    
+    **What Gets Created:**
+    1. **Facility Record**: Main facility information
+    2. **VectorDB**: `{facility_name}_VectorDB` for AI embeddings
+    3. **Shared Collection**: `Facility_Shared_Collection` for general documents
+    
+    **Example Response:**
+    ```json
+    {
+        "id": "c115e85c-b368-4e29-b945-2918fa679e57",
+        "name": "General Hospital",
+        "address": "123 Medical Center Dr, City, State 12345",
+        "external_id": "HOSP_001",
+        "created_at": "2024-01-15T10:30:00Z",
+        "updated_at": "2024-01-15T10:30:00Z"
+    }
+    ```
+    
+    **Use Cases:**
+    - Hospital system onboarding
+    - Clinic network expansion
+    - EMR system integration
+    - Multi-facility healthcare organizations
     """
     try:
         # Check if external_id already exists (if provided)
@@ -101,8 +131,6 @@ async def create_facility(facility_data: FacilityCreate, db: Session = Depends(g
         db.refresh(facility)
         
         # Create VectorDB for this facility
-        from app.models.sql_models import VectorDB as SQLVectorDB, Collection as SQLCollection
-        
         vector_db = SQLVectorDB(
             name=f"{facility_data.name}_VectorDB",
             facility_id=facility.id
@@ -121,11 +149,8 @@ async def create_facility(facility_data: FacilityCreate, db: Session = Depends(g
         
         db.add(shared_collection)
         db.commit()
-        db.refresh(shared_collection)
         
-        # TODO: Create a folder for facility uploads
-        # facility_folder = f"uploads/{facility.name.replace(' ', '_')}"
-        # os.makedirs(facility_folder, exist_ok=True)
+        logger.info(f"Facility created successfully: {facility.id}")
         
         return FacilityResponse(
             id=facility.id,
@@ -136,19 +161,22 @@ async def create_facility(facility_data: FacilityCreate, db: Session = Depends(g
             updated_at=facility.updated_at
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
+        logger.error(f"Error creating facility: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error creating facility: {str(e)}")
 
-@router.get("/facilities", response_model=list[FacilityResponse])
+@router.get("/facilities", response_model=List[FacilityResponse])
 async def list_facilities(db: Session = Depends(get_db_session)):
     """
-    List all facilities.
+    List all registered healthcare facilities.
     
     **Purpose:**
-    - Get a list of all facilities in the system
-    - Useful for admin interfaces and facility selection
-    - Includes external_id for integration purposes
+    - Get overview of all facilities in the system
+    - Useful for administrative dashboards
+    - Facility selection in user interfaces
     
     **Example Response:**
     ```json
@@ -157,12 +185,26 @@ async def list_facilities(db: Session = Depends(get_db_session)):
             "id": "c115e85c-b368-4e29-b945-2918fa679e57",
             "name": "General Hospital",
             "address": "123 Medical Center Dr, City, State 12345",
-            "external_id": "HOSP_SYS_12345",
-            "created_at": "2024-01-15T10:00:00Z",
-            "updated_at": "2024-01-15T10:00:00Z"
+            "external_id": "HOSP_001",
+            "created_at": "2024-01-15T10:30:00Z",
+            "updated_at": "2024-01-15T10:30:00Z"
+        },
+        {
+            "id": "d226f96d-c479-5f3a-c056-3029gb780e68",
+            "name": "City Clinic",
+            "address": "456 Health Ave, City, State 12345",
+            "external_id": "CLINIC_002",
+            "created_at": "2024-01-16T14:20:00Z",
+            "updated_at": "2024-01-16T14:20:00Z"
         }
     ]
     ```
+    
+    **Use Cases:**
+    - Administrative facility management
+    - System monitoring and reporting
+    - User interface facility selection
+    - Integration with external systems
     """
     facilities = db.query(SQLFacility).all()
     return [
@@ -178,21 +220,41 @@ async def list_facilities(db: Session = Depends(get_db_session)):
     ]
 
 @router.get("/facilities/{facility_id}", response_model=FacilityResponse)
-async def get_facility(facility_id: str, db: Session = Depends(get_db_session)):
+async def get_facility(
+    facility_id: UUID, 
+    db: Session = Depends(get_db_session)
+):
     """
-    Get facility by ID.
+    Get detailed information about a specific facility.
     
     **Purpose:**
-    - Get a specific facility by its UUID
-    - Includes external_id for integration purposes
+    - Retrieve complete facility details by UUID
+    - Verify facility existence before operations
+    - Display facility information in applications
     
-    **Path Parameters:**
-    - `facility_id`: The UUID of the facility
+    **Parameters:**
+    - `facility_id`: UUID of the facility
     
     **Example Request:**
     ```
     GET /api/v1/facilities/c115e85c-b368-4e29-b945-2918fa679e57
     ```
+    
+    **Example Response:**
+    ```json
+    {
+        "id": "c115e85c-b368-4e29-b945-2918fa679e57",
+        "name": "General Hospital",
+        "address": "123 Medical Center Dr, City, State 12345",
+        "external_id": "HOSP_001",
+        "created_at": "2024-01-15T10:30:00Z",
+        "updated_at": "2024-01-15T10:30:00Z"
+    }
+    ```
+    
+    **Error Responses:**
+    - `404`: Facility not found
+    - `422`: Invalid UUID format
     """
     facility = db.query(SQLFacility).filter(SQLFacility.id == facility_id).first()
     
