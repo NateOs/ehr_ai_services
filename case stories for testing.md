@@ -129,13 +129,13 @@ These case stories should guide the functional validation of AI modules in the E
 ## Enhanced Initial Testing Sequence:
 
 ### 1. Facility Foundation
-- [] Create facility (must exist first)
-- [] Auto-create facility's VectorDB
-- [] Auto-create facility's shared collection
+- [x] Create facility (must exist first)
+- [x] Auto-create facility's VectorDB
+- [x] Auto-create facility's shared collection
 - 🆕 **Validate facility isolation** (queries don't cross facilities)
 
 ### 2. Patient Creation & Setup
-- [] Create patient (linked to facility)
+- [x] Create patient (linked to facility)
 - [] Auto-create patient's dedicated collection
 - 🆕 **Validate patient-facility relationship constraints**
 - 🆕 **Test patient anonymization** (patient_code generation)
