@@ -80,7 +80,8 @@ class Document(Base):
 
     facility = relationship("Facility", back_populates="documents")
     collection = relationship("Collection", back_populates="documents")
-    patient_identifier = relationship("PatientIdentifier", back_populates="medical_documents")
+    # Fix: Change back_populates to match the correct relationship name
+    patient_identifier = relationship("PatientIdentifier", back_populates="documents")
 
 class PatientIdentifier(Base):
     __tablename__ = 'patient_identifiers'
@@ -99,7 +100,8 @@ class PatientIdentifier(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     facility = relationship("Facility", back_populates="patient_identifiers")
-    medical_documents = relationship("MedicalDocument", back_populates="patient_identifier")  # Update this line
+    documents = relationship("Document", back_populates="patient_identifier")
+    medical_documents = relationship("MedicalDocument", back_populates="patient_identifier")
 
 class MedicalDocument(Base):
     __tablename__ = 'medical_documents'
