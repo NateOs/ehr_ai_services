@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from uuid import UUID, uuid4
 from enum import Enum
@@ -172,3 +172,50 @@ class DocumentUploadResponse(BaseModel):
     document: DocumentResponse
     message: str
     processing_status: str = "queued"
+
+class AbnormalFlag(BaseModel):
+    parameter: str
+    value: str
+    normal_range: str
+    severity: str  # "low", "moderate", "high", "critical"
+    flag_type: str  # "low", "high", "abnormal"
+    unit: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class DiagnosticInsight(BaseModel):
+    category: str  # e.g., "hematology", "cardiology", "endocrinology"
+    insight: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    recommendations: List[str] = []
+    severity: Optional[str] = None  # "low", "moderate", "high", "critical"
+    
+    class Config:
+        from_attributes = True
+
+class AnalysisResultCreate(BaseModel):
+    patient_code: str
+    facility_id: UUID
+    analysis_type: str
+    content: str
+    include_history: bool = True
+    metadata: Optional[Dict[str, Any]] = None
+    
+    class Config:
+        from_attributes = True
+
+class AnalysisResultResponse(BaseModel):
+    analysis_id: Optional[UUID] = None
+    patient_code: str
+    facility_id: UUID
+    analysis_type: str
+    abnormal_flags: List[AbnormalFlag] = []
+    diagnostic_insights: List[DiagnosticInsight] = []
+    summary: str
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    recommendations: List[str] = []
+    created_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
