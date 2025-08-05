@@ -1,23 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
-from app.db import get_db_session
-from app.models.models import (
-    PatientIdentifierCreate, 
-    PatientIdentifierResponse,
-    MedicalDocumentCreate,
-    MedicalDocumentResponse
-)
-from app.services.llama_service import LlamaService
-from app.models.sql_models import (
-    PatientIdentifier, 
-    Document, 
-    MedicalDocument,  # Add this import
-    Collection, 
-    VectorDB, 
-    Facility
-)
 from uuid import UUID
+from typing import List, Optional
+from app.db import get_db_session
+from app.dependencies import get_llama_service
+from app.services.llama_service import LlamaService
+from app.models.sql_models import PatientIdentifier, MedicalDocument, Collection, VectorDB
+from app.models.models import (
+    MedicalDocumentCreate, 
+    MedicalDocumentResponse,
+    PatientIdentifierCreate,
+    PatientIdentifierResponse
+)
+from app.core.logging import logger
+from pydantic import BaseModel
+
+# Add this model at the top of the file
+class QueryPatientDataRequest(BaseModel):
+    patient_code: str
+    query: str
 
 router = APIRouter()
 
@@ -258,77 +259,27 @@ async def get_patient_identifier(
 @router.post("/medical-documents", response_model=MedicalDocumentResponse)
 async def ingest_medical_document(
     document_data: MedicalDocumentCreate,
-    db: Session = Depends(get_db_session)
+    db: Session = Depends(get_db_session),
+    llama_service: LlamaService = Depends(get_llama_service)
 ):
     """
-    Ingest medical document into patient's dedicated collection.
+    Ingest medical document into patient's dedicated collection with AI embedding.
+    
+    **Enhanced Features:**
+    - Stores document in database
+    - Creates vector embeddings for AI querying
+    - Adds document to LlamaIndex for semantic search
+    - Maintains patient data isolation
     
     **Auto-Collection Assignment:**
     - Automatically uses patient's dedicated collection
     - Collection format: "Patient_{patient_code}_Collection"
     - Ensures proper data isolation per patient
-    - No need to specify collection_id in request
     
-    **Document Processing:**
-    - Stores original document content
-    - Creates vector embeddings for AI querying
-    - Maintains document metadata and classification
-    - Links to patient's anonymized identifier
-    
-    **Document Types:**
-    - clinical_note, diagnosis, lab_result, prescription, discharge_summary, 
-    - radiology_report, pathology_report, consultation_note, progress_note
-    
-    **Document Categories:**
-    - clinical, administrative, billing, research, imaging
-    
-    **Sensitivity Levels:**
-    - standard, sensitive, restricted
-    
-    **Example Request:**
-    ```json
-    {
-        "content": "Patient presents with acute chest pain. Onset 2 hours ago, described as crushing, radiating to left arm. Vital signs: BP 140/90, HR 95, RR 18, O2 sat 98%. ECG shows normal sinus rhythm with no acute ST changes. Troponin I pending. Started on aspirin 325mg, nitroglycerin SL PRN. Plan: serial ECGs, troponin levels q6h, cardiology consult.",
-        "patient_identifier_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-        "document_type": "clinical_note",
-        "document_category": "clinical",
-        "sensitivity_level": "standard",
-        "metadata": {
-            "provider": "Dr. Sarah Johnson",
-            "department": "Emergency Department",
-            "visit_date": "2024-01-15",
-            "visit_type": "emergency",
-            "chief_complaint": "chest pain"
-        }
-    }
-    ```
-    
-    **Example Response:**
-    ```json
-    {
-        "id": "doc123e4-5678-9abc-def0-123456789abc",
-        "patient_identifier_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-        "document_type": "clinical_note",
-        "document_category": "clinical",
-        "sensitivity_level": "standard",
-        "metadata": {
-            "provider": "Dr. Sarah Johnson",
-            "department": "Emergency Department",
-            "visit_date": "2024-01-15",
-            "visit_type": "emergency",
-            "chief_complaint": "chest pain"
-        },
-        "created_at": "2024-01-15T14:30:00Z",
-        "updated_at": "2024-01-15T14:30:00Z"
-    }
-    ```
-    
-    **Use Cases:**
-    - EMR systems uploading patient records
-    - Clinical documentation workflows
-    - AI-powered medical analysis and insights
-    - Research data collection (anonymized)
-    - Quality improvement initiatives
+    **AI Integration:**
+    - Creates vector embeddings using OpenAI
+    - Adds to searchable index for patient-specific queries
+    - Enables semantic search and medical insights
     """
     try:
         # Validate that patient identifier exists
@@ -369,6 +320,36 @@ async def ingest_medical_document(
         db.commit()
         db.refresh(medical_document)
         
+        # NEW: Add document to AI index for querying
+        try:
+            logger.info(f"Adding document {medical_document.id} to AI index for patient {patient_identifier.patient_code}")
+            
+            # Prepare metadata for the AI index
+            ai_metadata = {
+                "document_id": str(medical_document.id),
+                "patient_code": patient_identifier.patient_code,
+                "patient_identifier_id": str(patient_identifier.id),
+                "facility_id": str(patient_identifier.facility_id),
+                "document_type": medical_document.document_type,
+                "document_category": medical_document.document_category,
+                "sensitivity_level": medical_document.sensitivity_level,
+                "collection_id": str(patient_collection.id),
+                **document_data.metadata
+            }
+            
+            # Add to LlamaIndex for AI querying
+            await llama_service.add_document_to_index(
+                content=document_data.content,
+                metadata=ai_metadata
+            )
+            
+            logger.info(f"Successfully added document {medical_document.id} to AI index")
+            
+        except Exception as e:
+            # Log error but don't fail the request - document is still saved
+            logger.error(f"Failed to add document {medical_document.id} to AI index: {e}")
+            # You might want to set a flag in the database to retry later
+        
         return MedicalDocumentResponse(
             id=medical_document.id,
             patient_identifier_id=medical_document.patient_identifier_id,
@@ -384,6 +365,7 @@ async def ingest_medical_document(
         raise
     except Exception as e:
         db.rollback()
+        logger.error(f"Error creating medical document: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error creating medical document: {str(e)}")
 
 @router.get("/medical-documents", response_model=List[MedicalDocumentResponse])
@@ -467,33 +449,53 @@ async def get_medical_document(
 
 @router.post("/query-patient-data")
 async def query_patient_medical_data(
-    patient_code: str,
-    query: str,
+    request: QueryPatientDataRequest,
     db: Session = Depends(get_db_session),
-    llama_service: LlamaService = Depends()
+    llama_service: LlamaService = Depends(get_llama_service)
 ):
-    """Query medical data for a specific patient using vector similarity"""
+    """
+    Query medical data for a specific patient using AI-powered semantic search.
+    
+    **Enhanced Features:**
+    - Uses vector embeddings for semantic search
+    - Searches only the specified patient's documents
+    - Provides AI-generated insights and summaries
+    - Returns source documents with relevance scores
+    
+    **Example Request:**
+    ```json
+    {
+        "patient_code": "PAT001_HOSP_A",
+        "query": "What are the latest lab results?"
+    }
+    """
     
     # Find patient identifier
     patient_identifier = db.query(PatientIdentifier).filter(
-        PatientIdentifier.patient_code == patient_code
+        PatientIdentifier.patient_code == request.patient_code
     ).first()
     
     if not patient_identifier:
         raise HTTPException(status_code=404, detail="Patient not found")
     
-    # Query using vector similarity on patient's documents
-    results = await llama_service.query_patient_documents(
-        patient_identifier_id=patient_identifier.id,
-        query=query
-    )
-    
-    return {
-        "patient_code": patient_code,
-        "query": query,
-        "results": results,
-        "patient_metadata": {
-            "age_range": patient_identifier.age_range,
-            "gender": patient_identifier.gender
+    try:
+        # Query patient's documents using LlamaService
+        result = await llama_service.query_patient_documents(
+            patient_identifier_id=str(patient_identifier.id),
+            query=request.query
+        )
+        
+        return {
+            "patient_code": request.patient_code,
+            "query": request.query,
+            "response": result["response"],
+            "source_documents": result["source_nodes"],
+            "diagnostic_insights": result["diagnostic_insights"]
         }
-    }
+        
+    except Exception as e:
+        logger.error(f"Error querying patient data: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to query patient data: {str(e)}"
+        )

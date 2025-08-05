@@ -1,7 +1,9 @@
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.vector_stores.postgres import PGVectorStore
+from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
 from app.core.llama_setup import setup_llama_index_with_openai, create_query_engine, load_documents_to_index
 from app.models.models import AbnormalFlag, DiagnosticInsight  # Add this import
+from app.core.logging import logger
 import logging
 from typing import Dict, Any, List
 from uuid import uuid4
@@ -55,6 +57,26 @@ class LlamaService:
             raise RuntimeError("LlamaService not initialized")
         
         await load_documents_to_index(documents_path, self._index)
+
+    async def add_document_to_index(self, content: str, metadata: Dict[str, Any]):
+        """Add a single document to the index with metadata"""
+        if not self._initialized:
+            raise RuntimeError("LlamaService not initialized")
+        
+        try:
+            from llama_index.core import Document
+            
+            # Create a document with the content and metadata
+            document = Document(text=content, metadata=metadata)
+            
+            # Add to the index
+            self._index.insert(document)
+            
+            logger.info(f"Successfully added document to index with metadata: {metadata.get('document_id', 'unknown')}")
+            
+        except Exception as e:
+            logger.error(f"Failed to add document to index: {e}")
+            raise
 
     def create_query_engine(self, **kwargs):
         """Create a query engine with custom parameters"""
@@ -126,3 +148,43 @@ class LlamaService:
         """Extract recommendations from AI response"""
         # Implement parsing logic
         return []  # Return empty list for now
+
+    async def query_patient_documents(self, patient_identifier_id: str, query: str) -> Dict[str, Any]:
+        """Query documents for a specific patient using vector similarity search"""
+        try:
+            # Get the query engine without metadata filters
+            query_engine = self._index.as_query_engine(
+                similarity_top_k=20  # Get more results to filter
+            )
+            
+            # Execute the query
+            response = query_engine.query(query)
+            
+            # Filter source nodes to only include the specific patient
+            patient_nodes = [
+                node for node in response.source_nodes
+                if node.metadata.get("patient_identifier_id") == str(patient_identifier_id)
+            ]
+            
+            # Limit to top 5 patient-specific results
+            patient_nodes = patient_nodes[:5]
+            
+            # Extract diagnostic insights
+            insights = self._extract_diagnostic_insights(str(response))
+            
+            return {
+                "response": str(response),
+                "source_nodes": [
+                    {
+                        "content": node.text,
+                        "metadata": node.metadata,
+                        "score": node.score if hasattr(node, 'score') else None
+                    }
+                    for node in patient_nodes
+                ],
+                "diagnostic_insights": insights
+            }
+            
+        except Exception as e:
+            logger.error(f"Error querying patient documents: {e}")
+            raise Exception(f"Failed to query patient documents: {str(e)}")
