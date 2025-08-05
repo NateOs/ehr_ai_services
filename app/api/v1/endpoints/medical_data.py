@@ -5,7 +5,7 @@ from typing import List, Optional
 from app.db import get_db_session
 from app.dependencies import get_llama_service
 from app.services.llama_service import LlamaService
-from app.models.sql_models import PatientIdentifier, MedicalDocument, Collection, VectorDB
+from app.models.sql_models import Facility, PatientIdentifier, MedicalDocument, Collection, VectorDB
 from app.models.models import (
     MedicalDocumentCreate, 
     MedicalDocumentResponse,
@@ -489,7 +489,7 @@ async def query_patient_medical_data(
             "patient_code": request.patient_code,
             "query": request.query,
             "response": result["response"],
-            "source_documents": result["source_nodes"],
+            "source_documents": result["source_nodes"],  # This should match what llama_service returns
             "diagnostic_insights": result["diagnostic_insights"]
         }
         

@@ -134,10 +134,104 @@ class LlamaService:
         # This could use regex, NLP, or structured prompting
         return []  # Return empty list for now
 
-    def _extract_diagnostic_insights(self, response_text: str) -> List[DiagnosticInsight]:
+    def _extract_diagnostic_insights(self, response_text: str) -> List[Dict[str, Any]]:
         """Extract diagnostic insights from AI response"""
-        # Implement parsing logic
-        return []  # Return empty list for now
+        insights = []
+        
+        # Simple keyword-based extraction for now
+        if "normal" in response_text.lower():
+            insights.append({
+                "category": "general",
+                "insight": "Values appear to be within normal ranges",
+                "confidence": 0.8,
+                "type": "normal_finding"
+            })
+        
+        if "abnormal" in response_text.lower() or "elevated" in response_text.lower():
+            insights.append({
+                "category": "abnormal_finding",
+                "insight": "Some values may require attention",
+                "confidence": 0.7,
+                "type": "potential_concern"
+            })
+        
+        # Enhanced medical terms for better coverage
+        medical_terms = {
+            # Lab values
+            "cholesterol": "lipid_panel",
+            "glucose": "metabolic_panel", 
+            "hemoglobin": "hematology",
+            "hematocrit": "hematology",
+            "white blood cell": "hematology",
+            "wbc": "hematology",
+            "red blood cell": "hematology",
+            "rbc": "hematology",
+            "platelet": "hematology",
+            "creatinine": "kidney_function",
+            "bun": "kidney_function",
+            "sodium": "electrolytes",
+            "potassium": "electrolytes",
+            "chloride": "electrolytes",
+            "co2": "electrolytes",
+            
+            # Vital signs
+            "blood pressure": "vital_signs",
+            "heart rate": "vital_signs",
+            "temperature": "vital_signs",
+            "respiratory rate": "vital_signs",
+            "oxygen saturation": "vital_signs",
+            
+            # Liver function
+            "alt": "liver_function",
+            "ast": "liver_function",
+            "bilirubin": "liver_function",
+            "alkaline phosphatase": "liver_function",
+            
+            # Cardiac markers
+            "troponin": "cardiac_markers",
+            "ck-mb": "cardiac_markers",
+            "bnp": "cardiac_markers",
+            "nt-probnp": "cardiac_markers",
+            
+            # Thyroid
+            "tsh": "thyroid_function",
+            "t3": "thyroid_function",
+            "t4": "thyroid_function",
+            
+            # Inflammatory markers
+            "esr": "inflammatory_markers",
+            "crp": "inflammatory_markers",
+            "c-reactive protein": "inflammatory_markers",
+            
+            # Coagulation
+            "pt": "coagulation",
+            "ptt": "coagulation",
+            "inr": "coagulation",
+            
+            # Urinalysis
+            "protein": "urinalysis",
+            "ketones": "urinalysis",
+            "specific gravity": "urinalysis",
+            
+            # Imaging
+            "x-ray": "imaging",
+            "ct scan": "imaging",
+            "mri": "imaging",
+            "ultrasound": "imaging",
+            "echocardiogram": "imaging"
+        }
+        
+        for term, category in medical_terms.items():
+            if term in response_text.lower():
+                insights.append({
+                    "category": category,
+                    "insight": f"Analysis includes {term} data",
+                    "confidence": 0.9,
+                    "type": "data_present",
+                    "parameter": term
+                })
+        
+        return insights
 
     def _extract_summary(self, response_text: str) -> str:
         """Extract summary from AI response"""
@@ -150,14 +244,17 @@ class LlamaService:
         return []  # Return empty list for now
 
     async def query_patient_documents(self, patient_identifier_id: str, query: str) -> Dict[str, Any]:
-        """Query documents for a specific patient using vector similarity search"""
+        """Query documents for a specific patient"""
         try:
-            # Get the query engine without metadata filters
-            query_engine = self._index.as_query_engine(
-                similarity_top_k=20  # Get more results to filter
-            )
+            if not self._initialized:
+                raise Exception("LlamaService not initialized")
             
-            # Execute the query
+            logger.info(f"Querying patient documents for patient {patient_identifier_id}")
+            
+            # Create query engine
+            query_engine = self.create_query_engine()
+            
+            # Query the index
             response = query_engine.query(query)
             
             # Filter source nodes to only include the specific patient
@@ -166,25 +263,24 @@ class LlamaService:
                 if node.metadata.get("patient_identifier_id") == str(patient_identifier_id)
             ]
             
-            # Limit to top 5 patient-specific results
-            patient_nodes = patient_nodes[:5]
+            # Convert source nodes to serializable format
+            source_documents = []
+            for node in patient_nodes:
+                source_documents.append({
+                    "content": node.text,
+                    "metadata": node.metadata,
+                    "score": getattr(node, 'score', None)
+                })
             
             # Extract diagnostic insights
-            insights = self._extract_diagnostic_insights(str(response))
+            diagnostic_insights = self._extract_diagnostic_insights(str(response))
             
             return {
                 "response": str(response),
-                "source_nodes": [
-                    {
-                        "content": node.text,
-                        "metadata": node.metadata,
-                        "score": node.score if hasattr(node, 'score') else None
-                    }
-                    for node in patient_nodes
-                ],
-                "diagnostic_insights": insights
+                "source_nodes": source_documents,
+                "diagnostic_insights": diagnostic_insights
             }
             
         except Exception as e:
-            logger.error(f"Error querying patient documents: {e}")
+            logger.error(f"Error querying patient documents: {str(e)}")
             raise Exception(f"Failed to query patient documents: {str(e)}")
