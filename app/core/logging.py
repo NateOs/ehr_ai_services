@@ -10,3 +10,6 @@ def setup_logging():
             logging.StreamHandler(sys.stdout)
         ]
     )
+
+# Create and export a logger instance
+logger = logging.getLogger(__name__)
