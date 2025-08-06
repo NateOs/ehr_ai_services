@@ -14,9 +14,32 @@ some of these are going to be background processes that will populate the db wit
 [x] GET /api/v1/patient-identifiers/patient_code
    - get patient identifier with patient code(this is the real anon identifier)
 
+[x] POST /api/v1/documents/upload (upload documents)
+   - Upload medical documents for processing with metadata
+
+[x] GET /api/v1/documents (get documents)
+   - Get documents with optional filtering by facility, patient, type, processed status
+
+[x] GET /api/v1/facilities (list facilities)
+   - List all registered healthcare facilities
+
+[x] POST /api/v1/facilities (create facility)
+   - Create new healthcare facility
+
+[x] GET /api/v1/facilities/{facility_id} (get facility by ID)
+   - Get specific facility details
+
+[x] GET /api/v1/facilities/external/{external_id} (get facility by external ID)
+   - Get facility by external system identifier
+
+[x] POST /api/v1/query-patient-data (query patient documents)
+   - Query patient documents using natural language (based on terminal logs)
+
+[x] GET /api/v1/query/health (query service health check)
+   - Check if the query service is ready to handle requests
 
 //  for the professional
-[] POST /api/v1/analyze/results
+[x] POST /api/v1/analyze/results
    - takes in either a file and text data or just text data about a patient's record, could be both text and document at the same time
    - Flag abnormal results or provide diagnostic insights about a patient
 
@@ -56,5 +79,3 @@ some of these are going to be background processes that will populate the db wit
 
 [] POST /training_endpoint
    - will accept files, images, text data?
-
-
