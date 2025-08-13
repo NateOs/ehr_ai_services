@@ -62,7 +62,7 @@ some of these are going to be background processes that will populate the db wit
    - Interpret and explain lab results in simple terms
 
 // for the professional
-[] POST /api/v1/query/clinical
+[x] POST /api/v1/query/clinical
    - Allow natural language queries on patient data
 
 [] POST /api/v1/generate/clinical-notes

@@ -467,46 +467,77 @@ def _extract_related_conditions(response_text: str) -> List[str]:
     conditions = []
     lines = response_text.split('\n')
     
-    # Look for sections mentioning related conditions
+    in_conditions_section = False
     for line in lines:
         line = line.strip()
-        if any(phrase in line.lower() for phrase in ['related condition', 'differential', 'consider', 'rule out']):
-            # Extract conditions from this line
-            if ':' in line:
-                condition_text = line.split(':', 1)[1].strip()
-                # Split by common separators
-                for separator in [',', ';', 'and', 'or']:
-                    if separator in condition_text:
-                        conditions.extend([c.strip() for c in condition_text.split(separator)])
-                        break
-                else:
-                    conditions.append(condition_text)
+        if 'related condition' in line.lower() or 'differential' in line.lower():
+            in_conditions_section = True
+            continue
+        elif in_conditions_section and line.startswith('-'):
+            conditions.append(line[1:].strip())
+        elif in_conditions_section and line.startswith(('1.', '2.', '3.', '4.', '5.')):
+            conditions.append(line[2:].strip())
+        elif in_conditions_section and line and not line.startswith(('-', '•')):
+            in_conditions_section = False
     
-    # Clean and deduplicate
-    conditions = [c for c in conditions if c and len(c) > 2]
-    return list(set(conditions))[:5]  # Limit to top 5 unique conditions
+    return conditions[:5]
 
-def _calculate_clinical_confidence(response_text: str, clinical_insights: List[ClinicalInsight], num_sources: int) -> float:
-    """Calculate confidence score based on response quality and number of sources."""
-    base_confidence = 0.5
+def _calculate_clinical_confidence(response_text: str, insights: List[ClinicalInsight], source_count: int) -> float:
+    """Calculate overall confidence score for clinical response."""
+    base_confidence = 0.7
     
-    # Boost confidence based on number of insights
-    insight_boost = min(len(clinical_insights) * 0.1, 0.3)
+    # Adjust based on insights quality
+    if insights:
+        avg_insight_confidence = sum(insight.confidence for insight in insights) / len(insights)
+        base_confidence = (base_confidence + avg_insight_confidence) / 2
     
-    # Boost confidence based on number of sources
-    source_boost = min(num_sources * 0.05, 0.2)
+    # Adjust based on source documents
+    if source_count > 0:
+        base_confidence += min(0.1, source_count * 0.02)
     
-    # Boost confidence based on response length and detail
-    response_length_boost = min(len(response_text) / 1000 * 0.1, 0.2)
+    # Adjust based on response quality indicators
+    response_lower = response_text.lower()
+    if any(word in response_lower for word in ['uncertain', 'unclear', 'insufficient']):
+        base_confidence -= 0.1
+    elif any(word in response_lower for word in ['confirmed', 'definitive', 'clear']):
+        base_confidence += 0.1
     
-    # Average confidence from individual insights
-    if clinical_insights:
-        avg_insight_confidence = sum(insight.confidence for insight in clinical_insights) / len(clinical_insights)
-        insight_confidence_boost = (avg_insight_confidence - 0.5) * 0.3
-    else:
-        insight_confidence_boost = 0
+    return min(1.0, max(0.1, base_confidence))
+
+@router.get("/health")
+async def query_service_health(
+    llama_service: LlamaService = Depends(get_llama_service)
+):
+    """
+    Check if the query service is ready to handle requests.
     
-    total_confidence = base_confidence + insight_boost + source_boost + response_length_boost + insight_confidence_boost
+    **Purpose:**
+    - Verify that the LlamaIndex service is properly initialized
+    - Check system readiness for processing clinical queries
+    - Provide service status information
     
-    # Ensure confidence is between 0 and 1
-    return max(0.0, min(1.0, total_confidence))
+    **Response:**
+    ```json
+    {
+        "status": "healthy",
+        "service": "clinical_query",
+        "ready": true,
+        "timestamp": "2024-01-15T10:30:00Z"
+    }
+    ```
+    """
+    try:
+        is_ready = await llama_service.is_ready()
+        
+        return {
+            "status": "healthy" if is_ready else "not_ready",
+            "service": "clinical_query",
+            "ready": is_ready,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Query service health check failed: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Query service health check failed: {str(e)}"
+        )
