@@ -324,14 +324,20 @@ class LlamaService:
             {clinical_notes}
             
             Please structure your response with clear sections for ICD-10 and CPT codes.
+            Include specific code numbers and descriptions.
+            
+            Example format:
+            ICD-10 Codes:
+            - I21.19: ST elevation myocardial infarction involving other coronary artery of inferior wall
+            - E11.9: Type 2 diabetes mellitus without complications
+            
+            CPT Codes:
+            - 92928: Percutaneous transcatheter placement of intracoronary stent(s)
+            - 93010: Electrocardiogram, routine ECG with at least 12 leads
             """
             
-            # Use the existing query method
-            response = await self.query_documents(
-                query=enhanced_prompt,
-                patient_code=None,
-                max_results=max_suggestions
-            )
+            # Use the existing query method instead of query_documents
+            response = await self.query(enhanced_prompt)
             
             # Parse the response to extract structured code data
             parsed_result = self._parse_coding_response(
@@ -365,50 +371,88 @@ class LlamaService:
         icd10_codes = []
         cpt_codes = []
         
-        # Extract ICD-10 codes if requested
-        if include_diagnoses:
-            icd10_pattern = r'([A-Z]\d{2}\.?\d*)\s*[-:]?\s*([^,\n]+)'
-            icd10_matches = re.findall(icd10_pattern, response_text, re.IGNORECASE)
-            
-            for i, (code, description) in enumerate(icd10_matches[:max_suggestions]):
-                confidence = 0.9 - (i * 0.1)  # Decreasing confidence
-                category = "primary" if i == 0 else "secondary"
+        try:
+            # Extract ICD-10 codes if requested
+            if include_diagnoses:
+                # Look for ICD-10 pattern: Letter followed by 2 digits, optional dot, more digits
+                icd10_pattern = r'([A-Z]\d{2}\.?\d*)\s*[-:]?\s*([^\n\r]+?)(?=\n|$|[A-Z]\d{2}\.?\d*|\d{5})'
+                icd10_matches = re.findall(icd10_pattern, response_text, re.IGNORECASE | re.MULTILINE)
                 
-                icd10_codes.append({
-                    'code': code.upper(),
-                    'description': description.strip(),
-                    'confidence': max(confidence, 0.5),
-                    'category': category
-                })
-        
-        # Extract CPT codes if requested
-        if include_procedures:
-            cpt_pattern = r'(\d{5})\s*[-:]?\s*([^,\n]+)'
-            cpt_matches = re.findall(cpt_pattern, response_text)
+                for i, (code, description) in enumerate(icd10_matches[:max_suggestions]):
+                    confidence = max(0.9 - (i * 0.1), 0.5)  # Decreasing confidence
+                    category = "primary" if i == 0 else "secondary"
+                    
+                    icd10_codes.append({
+                        'code': code.upper().strip(),
+                        'description': description.strip(),
+                        'confidence': confidence,
+                        'category': category
+                    })
             
-            for i, (code, description) in enumerate(cpt_matches[:max_suggestions]):
-                confidence = 0.85 - (i * 0.1)  # Decreasing confidence
+            # Extract CPT codes if requested
+            if include_procedures:
+                # Look for CPT pattern: 5 digits
+                cpt_pattern = r'(\d{5})\s*[-:]?\s*([^\n\r]+?)(?=\n|$|[A-Z]\d{2}\.?\d*|\d{5})'
+                cpt_matches = re.findall(cpt_pattern, response_text, re.MULTILINE)
                 
-                cpt_codes.append({
-                    'code': code,
-                    'description': description.strip(),
-                    'confidence': max(confidence, 0.5),
-                    'category': "procedure"
-                })
-        
-        # Extract clinical summary
-        summary_lines = []
-        for line in response_text.split('\n'):
-            line = line.strip()
-            if line and not re.match(r'^', line):
-                summary_lines.append(line)
-        
-        clinical_summary = "\n".join(summary_lines)
-        
-        return {
-            'icd10_codes': icd10_codes,
-            'cpt_codes': cpt_codes,
-            'clinical_summary': clinical_summary,
-            'confidence_score': 0.85,  # Placeholder confidence score
-            'processing_notes': ["Parsed response for coding suggestions"]
-        }
+                for i, (code, description) in enumerate(cpt_matches[:max_suggestions]):
+                    confidence = max(0.85 - (i * 0.1), 0.5)  # Decreasing confidence
+                    
+                    cpt_codes.append({
+                        'code': code.strip(),
+                        'description': description.strip(),
+                        'confidence': confidence,
+                        'category': "procedure"
+                    })
+            
+            # Extract clinical summary
+            summary_lines = []
+            lines = response_text.split('\n')
+            
+            for line in lines:
+                line = line.strip()
+                # Skip lines that look like codes or headers
+                if (line and 
+                    not re.match(r'^[A-Z]\d{2}\.?\d*', line) and 
+                    not re.match(r'^\d{5}', line) and
+                    not line.startswith(('ICD', 'CPT', 'Code:', 'Confidence:')) and
+                    len(line) > 20 and 
+                    '.' in line):
+                    summary_lines.append(line)
+            
+            clinical_summary = ' '.join(summary_lines[:3]) if summary_lines else "Medical coding analysis completed based on clinical notes."
+            
+            # Calculate overall confidence
+            all_suggestions = icd10_codes + cpt_codes
+            if all_suggestions:
+                avg_confidence = sum(code['confidence'] for code in all_suggestions) / len(all_suggestions)
+                confidence_score = min(avg_confidence + 0.1, 1.0) if len(all_suggestions) >= 3 else avg_confidence
+            else:
+                confidence_score = 0.5
+            
+            # Generate processing notes
+            processing_notes = []
+            if icd10_codes:
+                processing_notes.append(f"Found {len(icd10_codes)} ICD-10 diagnosis codes")
+            if cpt_codes:
+                processing_notes.append(f"Found {len(cpt_codes)} CPT procedure codes")
+            if not icd10_codes and not cpt_codes:
+                processing_notes.append("No specific medical codes identified in the clinical notes")
+            
+            return type('obj', (object,), {
+                'icd10_codes': icd10_codes,
+                'cpt_codes': cpt_codes,
+                'clinical_summary': clinical_summary,
+                'confidence_score': confidence_score,
+                'processing_notes': processing_notes
+            })
+            
+        except Exception as e:
+            logger.error(f"Error parsing coding response: {str(e)}")
+            return type('obj', (object,), {
+                'icd10_codes': [],
+                'cpt_codes': [],
+                'clinical_summary': "Error parsing medical codes from analysis",
+                'confidence_score': 0.3,
+                'processing_notes': [f"Parsing error: {str(e)}"]
+            })
