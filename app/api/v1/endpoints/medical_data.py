@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.db import get_db_session
 from app.dependencies import get_llama_service
 from app.services.llama_service import LlamaService
@@ -10,10 +10,12 @@ from app.models.models import (
     MedicalDocumentCreate, 
     MedicalDocumentResponse,
     PatientIdentifierCreate,
-    PatientIdentifierResponse
+    PatientIdentifierResponse,
+    PatientSummaryResponse
 )
 from app.core.logging import logger
 from pydantic import BaseModel
+from datetime import datetime, timedelta
 
 # Add this model at the top of the file
 class QueryPatientDataRequest(BaseModel):
@@ -499,3 +501,239 @@ async def query_patient_medical_data(
             status_code=500,
             detail=f"Failed to query patient data: {str(e)}"
         )
+
+@router.get("/patient/{patient_code}/summary", response_model=PatientSummaryResponse)
+async def get_patient_summary(
+    patient_code: str,
+    days_back: int = 30,
+    db: Session = Depends(get_db_session),
+    llama_service: LlamaService = Depends(get_llama_service)
+):
+    """
+    Generate comprehensive patient history summary with AI analysis.
+    """
+    try:
+        # Find patient identifier
+        patient_identifier = db.query(PatientIdentifier).filter(
+            PatientIdentifier.patient_code == patient_code
+        ).first()
+        
+        if not patient_identifier:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        
+        # Get facility information
+        facility = db.query(Facility).filter(
+            Facility.id == patient_identifier.facility_id
+        ).first()
+        
+        if not facility:
+            raise HTTPException(status_code=404, detail="Facility not found")
+        
+        # Calculate date range for recent records
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        
+        # Get recent medical documents
+        recent_documents = db.query(MedicalDocument).filter(
+            MedicalDocument.patient_identifier_id == patient_identifier.id,
+            MedicalDocument.created_at >= cutoff_date
+        ).order_by(MedicalDocument.created_at.desc()).all()
+        
+        if not recent_documents:
+            # Return empty summary instead of 404
+            return PatientSummaryResponse(
+                patient_code=patient_code,
+                facility_name=facility.name,
+                summary_period=f"Last {days_back} days",
+                total_documents=0,
+                document_types=[],
+                ai_generated_summary=f"No medical records found for patient {patient_code} in the last {days_back} days.",
+                key_findings=[],
+                recent_activities=[],
+                health_trends={"improving": [], "stable": [], "concerning": []},
+                recommendations=["Schedule routine check-up", "Ensure patient records are up to date"],
+                last_updated=datetime.now(),
+                confidence_score=0.0
+            )
+        
+        # Prepare document analysis data
+        document_types = list(set([doc.document_type for doc in recent_documents]))
+        total_documents = len(recent_documents)
+        
+        # Prepare recent activities
+        recent_activities = []
+        for doc in recent_documents[:10]:
+            recent_activities.append({
+                "date": doc.created_at.strftime("%Y-%m-%d"),
+                "type": doc.document_type,
+                "summary": doc.content[:100] + "..." if len(doc.content) > 100 else doc.content,
+                "document_id": str(doc.id)
+            })
+        
+        # Prepare comprehensive analysis prompt
+        documents_content = ""
+        for i, doc in enumerate(recent_documents, 1):
+            documents_content += f"""
+Document {i} ({doc.document_type}) - {doc.created_at.strftime('%Y-%m-%d')}:
+{doc.content}
+
+---
+"""
+        
+        analysis_prompt = f"""
+        Analyze the following medical records for patient {patient_code} from {facility.name}.
+        
+        Time Period: Last {days_back} days
+        Total Documents: {total_documents}
+        Document Types: {', '.join(document_types)}
+        
+        MEDICAL RECORDS:
+        {documents_content}
+        
+        Please provide a comprehensive analysis including:
+        
+        1. OVERALL SUMMARY: A concise overview of the patient's current health status
+        2. KEY FINDINGS: Specific important observations or test results
+        3. HEALTH TRENDS: What's improving, stable, or concerning
+        4. RECOMMENDATIONS: Specific next steps for patient care
+        
+        Provide clear, professional medical insights.
+        """
+        
+        # Generate AI analysis
+        try:
+            ai_response = await llama_service.query(analysis_prompt)
+            ai_summary = str(ai_response)
+        except Exception as e:
+            logger.error(f"Error generating AI summary: {str(e)}")
+            ai_summary = f"AI analysis temporarily unavailable. {total_documents} documents reviewed from {days_back} days."
+        
+        # Extract structured data from AI response
+        key_findings = _extract_key_findings(ai_summary)
+        health_trends = _extract_health_trends(ai_summary)
+        recommendations = _extract_recommendations(ai_summary)
+        
+        # Calculate confidence score
+        confidence_score = _calculate_confidence_score(recent_documents, total_documents)
+        
+        # Create response
+        summary_response = PatientSummaryResponse(
+            patient_code=patient_code,
+            facility_name=facility.name,
+            summary_period=f"Last {days_back} days",
+            total_documents=total_documents,
+            document_types=document_types,
+            ai_generated_summary=ai_summary,
+            key_findings=key_findings,
+            recent_activities=recent_activities,
+            health_trends=health_trends,
+            recommendations=recommendations,
+            last_updated=datetime.now(),
+            confidence_score=confidence_score
+        )
+        
+        logger.info(f"Generated summary for patient {patient_code} with {total_documents} documents")
+        return summary_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating patient summary: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating patient summary: {str(e)}"
+        )
+
+def _extract_key_findings(ai_summary: str) -> List[str]:
+    """Extract key findings from AI summary text."""
+    findings = []
+    lines = ai_summary.split('\n')
+    
+    in_findings_section = False
+    for line in lines:
+        line = line.strip()
+        if 'key finding' in line.lower() or 'findings:' in line.lower():
+            in_findings_section = True
+            continue
+        elif in_findings_section and line.startswith('-'):
+            findings.append(line[1:].strip())
+        elif in_findings_section and line.startswith(('1.', '2.', '3.', '4.', '5.')):
+            findings.append(line[2:].strip())
+        elif in_findings_section and line and not line.startswith(('-', '•')):
+            in_findings_section = False
+    
+    if not findings:
+        for line in lines:
+            line = line.strip()
+            if line.startswith(('-', '•')) and len(line) > 10:
+                findings.append(line[1:].strip())
+    
+    return findings[:5]
+
+def _extract_health_trends(ai_summary: str) -> Dict[str, List[str]]:
+    """Extract health trends from AI summary text."""
+    trends = {
+        "improving": [],
+        "stable": [],
+        "concerning": []
+    }
+    
+    lines = ai_summary.split('\n')
+    current_category = None
+    
+    for line in lines:
+        line = line.strip().lower()
+        if 'improving' in line:
+            current_category = "improving"
+        elif 'stable' in line:
+            current_category = "stable"
+        elif 'concerning' in line or 'concern' in line:
+            current_category = "concerning"
+        elif current_category and line.startswith('-'):
+            trends[current_category].append(line[1:].strip())
+    
+    return trends
+
+def _extract_recommendations(ai_summary: str) -> List[str]:
+    """Extract recommendations from AI summary text."""
+    recommendations = []
+    lines = ai_summary.split('\n')
+    
+    in_recommendations_section = False
+    for line in lines:
+        line = line.strip()
+        if 'recommendation' in line.lower():
+            in_recommendations_section = True
+            continue
+        elif in_recommendations_section and line.startswith('-'):
+            recommendations.append(line[1:].strip())
+        elif in_recommendations_section and line.startswith(('1.', '2.', '3.', '4.', '5.')):
+            recommendations.append(line[2:].strip())
+        elif in_recommendations_section and line and not line.startswith(('-', '•')):
+            in_recommendations_section = False
+    
+    return recommendations[:5]
+
+def _calculate_confidence_score(documents: List[MedicalDocument], total_count: int) -> float:
+    """Calculate confidence score based on data quality and quantity."""
+    base_score = 0.5
+    
+    if total_count >= 5:
+        base_score += 0.2
+    elif total_count >= 3:
+        base_score += 0.1
+    
+    doc_types = set([doc.document_type for doc in documents])
+    if len(doc_types) >= 3:
+        base_score += 0.15
+    elif len(doc_types) >= 2:
+        base_score += 0.1
+    
+    recent_docs = [doc for doc in documents if (datetime.now() - doc.created_at).days <= 7]
+    if len(recent_docs) >= 2:
+        base_score += 0.1
+    
+    docs_with_metadata = [doc for doc in documents if doc.metadata_json]
+    if len(docs_with_metadata) > len(documents) * 0.5:
+        base_score += 0.05
+    
+    return min(base_score, 1.0)

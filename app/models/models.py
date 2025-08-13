@@ -241,3 +241,20 @@ class DischargeInstructionResponse(BaseModel):
     generated_at: str
     language: str
     reading_level: str
+
+class PatientSummaryResponse(BaseModel):
+    patient_code: str
+    facility_name: str
+    summary_period: str
+    total_documents: int
+    document_types: List[str]
+    ai_generated_summary: str
+    key_findings: List[str]
+    recent_activities: List[Dict[str, Any]]
+    health_trends: Optional[Dict[str, List[str]]]
+    recommendations: List[str]
+    last_updated: datetime
+    confidence_score: float
+    
+    class Config:
+        from_attributes = True

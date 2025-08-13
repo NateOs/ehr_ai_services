@@ -43,7 +43,7 @@ some of these are going to be background processes that will populate the db wit
    - takes in either a file and text data or just text data about a patient's record, could be both text and document at the same time
    - Flag abnormal results or provide diagnostic insights about a patient
 
-[] GET /api/v1/patient/{id}/summary
+[x] GET /api/v1/patient/{id}/summary
    - should get last records of patient and perform analysis then return reponse
    - Generate patient history summary
 
