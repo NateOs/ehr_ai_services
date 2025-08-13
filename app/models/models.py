@@ -258,3 +258,34 @@ class PatientSummaryResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class CodeSuggestion(BaseModel):
+    code: str
+    description: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    category: str  # "primary", "secondary", "procedure"
+    code_type: str  # "ICD-10", "CPT"
+    
+    class Config:
+        from_attributes = True
+
+class CodeSuggestionRequest(BaseModel):
+    clinical_notes: str
+    patient_code: Optional[str] = None
+    facility_id: Optional[UUID] = None
+    include_procedures: bool = True
+    include_diagnoses: bool = True
+    max_suggestions: int = Field(default=10, ge=1, le=20)
+    
+class CodeSuggestionResponse(BaseModel):
+    patient_code: Optional[str]
+    facility_id: Optional[UUID]
+    icd10_suggestions: List[CodeSuggestion] = []
+    cpt_suggestions: List[CodeSuggestion] = []
+    clinical_summary: str
+    confidence_score: float
+    processing_notes: List[str] = []
+    created_at: datetime = Field(default_factory=datetime.now)
+    
+    class Config:
+        from_attributes = True

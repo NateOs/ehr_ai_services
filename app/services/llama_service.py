@@ -5,9 +5,11 @@ from app.core.llama_setup import setup_llama_index_with_openai, create_query_eng
 from app.models.models import AbnormalFlag, DiagnosticInsight  # Add this import
 from app.core.logging import logger
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from uuid import uuid4
 from datetime import datetime
+import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -284,3 +286,129 @@ class LlamaService:
         except Exception as e:
             logger.error(f"Error querying patient documents: {str(e)}")
             raise Exception(f"Failed to query patient documents: {str(e)}")
+# TODO calculate confidence score based on response quality
+    async def suggest_medical_codes(
+        self,
+        prompt: str,
+        clinical_notes: str,
+        include_diagnoses: bool = True,
+        include_procedures: bool = True,
+        max_suggestions: int = 10
+    ) -> Any:
+        """
+        Suggest ICD-10 and CPT codes based on clinical notes.
+        
+        Args:
+            prompt: The analysis prompt
+            clinical_notes: The clinical notes to analyze
+            include_diagnoses: Whether to include ICD-10 diagnosis codes
+            include_procedures: Whether to include CPT procedure codes
+            max_suggestions: Maximum number of suggestions per code type
+        
+        Returns:
+            Analysis result with suggested codes
+        """
+        try:
+            # Enhanced prompt for medical coding
+            enhanced_prompt = f"""
+            {prompt}
+            
+            Additional Context:
+            - Focus on the most relevant and specific codes
+            - Prioritize primary diagnoses and main procedures
+            - Consider comorbidities and complications
+            - Ensure codes are current and valid
+            - Provide rationale for high-confidence suggestions
+            
+            Clinical Notes Analysis:
+            {clinical_notes}
+            
+            Please structure your response with clear sections for ICD-10 and CPT codes.
+            """
+            
+            # Use the existing query method
+            response = await self.query_documents(
+                query=enhanced_prompt,
+                patient_code=None,
+                max_results=max_suggestions
+            )
+            
+            # Parse the response to extract structured code data
+            parsed_result = self._parse_coding_response(
+                str(response),
+                include_diagnoses,
+                include_procedures,
+                max_suggestions
+            )
+            
+            return parsed_result
+            
+        except Exception as e:
+            logger.error(f"Error in suggest_medical_codes: {str(e)}")
+            # Return a basic structure if parsing fails
+            return type('obj', (object,), {
+                'icd10_codes': [],
+                'cpt_codes': [],
+                'clinical_summary': f"Analysis completed with error: {str(e)}",
+                'confidence_score': 0.3,
+                'processing_notes': [f"Error occurred during analysis: {str(e)}"]
+            })
+
+    def _parse_coding_response(
+        self,
+        response_text: str,
+        include_diagnoses: bool,
+        include_procedures: bool,
+        max_suggestions: int
+    ) -> Any:
+        """Parse AI response to extract structured coding data."""
+        icd10_codes = []
+        cpt_codes = []
+        
+        # Extract ICD-10 codes if requested
+        if include_diagnoses:
+            icd10_pattern = r'([A-Z]\d{2}\.?\d*)\s*[-:]?\s*([^,\n]+)'
+            icd10_matches = re.findall(icd10_pattern, response_text, re.IGNORECASE)
+            
+            for i, (code, description) in enumerate(icd10_matches[:max_suggestions]):
+                confidence = 0.9 - (i * 0.1)  # Decreasing confidence
+                category = "primary" if i == 0 else "secondary"
+                
+                icd10_codes.append({
+                    'code': code.upper(),
+                    'description': description.strip(),
+                    'confidence': max(confidence, 0.5),
+                    'category': category
+                })
+        
+        # Extract CPT codes if requested
+        if include_procedures:
+            cpt_pattern = r'(\d{5})\s*[-:]?\s*([^,\n]+)'
+            cpt_matches = re.findall(cpt_pattern, response_text)
+            
+            for i, (code, description) in enumerate(cpt_matches[:max_suggestions]):
+                confidence = 0.85 - (i * 0.1)  # Decreasing confidence
+                
+                cpt_codes.append({
+                    'code': code,
+                    'description': description.strip(),
+                    'confidence': max(confidence, 0.5),
+                    'category': "procedure"
+                })
+        
+        # Extract clinical summary
+        summary_lines = []
+        for line in response_text.split('\n'):
+            line = line.strip()
+            if line and not re.match(r'^', line):
+                summary_lines.append(line)
+        
+        clinical_summary = "\n".join(summary_lines)
+        
+        return {
+            'icd10_codes': icd10_codes,
+            'cpt_codes': cpt_codes,
+            'clinical_summary': clinical_summary,
+            'confidence_score': 0.85,  # Placeholder confidence score
+            'processing_notes': ["Parsed response for coding suggestions"]
+        }
