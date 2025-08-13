@@ -219,3 +219,25 @@ class AnalysisResultResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class DischargeInstructionRequest(BaseModel):
+    patient_identifier_id: UUID
+    diagnosis: str
+    medications: List[str] = []
+    follow_up_instructions: Optional[str] = None
+    activity_restrictions: Optional[str] = None
+    diet_instructions: Optional[str] = None
+    warning_signs: Optional[str] = None
+    additional_notes: Optional[str] = None
+    language_preference: str = "english"
+    reading_level: str = "standard"  # "simple", "standard", "detailed"
+
+class DischargeInstructionResponse(BaseModel):
+    patient_identifier_id: UUID
+    discharge_instructions: str
+    medication_explanations: List[str] = []
+    follow_up_summary: Optional[str] = None
+    emergency_contact_info: Optional[str] = None
+    generated_at: str
+    language: str
+    reading_level: str
