@@ -289,3 +289,37 @@ class CodeSuggestionResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class ClinicalQueryRequest(BaseModel):
+    query: str = Field(..., min_length=5, max_length=1000)
+    patient_code: Optional[str] = None
+    facility_id: Optional[UUID] = None
+    query_type: str = Field(default="general", pattern="^(general|diagnostic|treatment|medication|lab_results|imaging|history)$")
+    include_context: bool = True
+    include_sources: bool = True
+    date_range_days: Optional[int] = Field(default=None, ge=1, le=365)
+    max_results: int = Field(default=10, ge=1, le=50)
+    
+class ClinicalInsight(BaseModel):
+    category: str  # "diagnosis", "treatment", "medication", "lab", "imaging", "risk_factor"
+    insight: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    supporting_evidence: List[str] = []
+    clinical_significance: str  # "high", "medium", "low"
+    
+class ClinicalQueryResponse(BaseModel):
+    query: str
+    patient_code: Optional[str]
+    facility_id: Optional[UUID]
+    response: str
+    clinical_insights: List[ClinicalInsight] = []
+    source_documents: List[Dict[str, Any]] = []
+    related_conditions: List[str] = []
+    recommendations: List[str] = []
+    confidence_score: float
+    query_type: str
+    processing_time: float
+    created_at: datetime = Field(default_factory=datetime.now)
+    
+    class Config:
+        from_attributes = True

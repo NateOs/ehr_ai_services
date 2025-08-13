@@ -47,7 +47,7 @@ some of these are going to be background processes that will populate the db wit
    - should get last records of patient and perform analysis then return reponse
    - Generate patient history summary
 
-[] POST /api/v1/suggest/codes
+[x] POST /api/v1/suggest/codes
    - based on training data
    - Suggest ICD-10 and CPT codes based on clinical notes
 
