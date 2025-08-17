@@ -50,3 +50,5 @@ Implement a background process to periodically update the general medical knowle
 Consider a caching layer for frequently accessed data to improve performance.
 
 the facility should also be identifiable by its external id
+
+<!-- TODO modify startup procedure such that app starting doesnt need to finish training docs first -->
