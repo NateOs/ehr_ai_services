@@ -79,3 +79,6 @@ some of these are going to be background processes that will populate the db wit
 
 [] POST /training_endpoint
    - will accept files, images, text data?
+
+[] AUTH /auth
+   - design and build auth process
